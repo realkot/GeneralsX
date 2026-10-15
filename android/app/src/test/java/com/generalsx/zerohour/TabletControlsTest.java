@@ -30,7 +30,11 @@ public class TabletControlsTest {
         assertEquals(0,defaults.get("diagnostics"));assertEquals(1,defaults.get("attackMove"));
         assertEquals(200,defaults.get("cursorPercent"));assertEquals(31,defaults.get("panelMask"));
     }
-    @Test public void activityRestoresWithoutStartingNativeEngine() {
+    @Test public void activityRestoresWithoutStartingNativeEngine() throws Exception {
+        Context context=RuntimeEnvironment.getApplication();
+        android.content.pm.ActivityInfo info=context.getPackageManager().getActivityInfo(
+            new android.content.ComponentName(context,TabletControlsActivity.class),0);
+        assertFalse(info.exported);
         TabletControlsActivity activity=Robolectric.buildActivity(TabletControlsActivity.class).setup().get();
         assertNotNull(activity.findViewById(android.R.id.content));
         assertFalse(activity.isFinishing());
