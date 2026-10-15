@@ -46,6 +46,8 @@
 #include "GameClient/Color.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/GadgetStaticText.h"
+#include "GameClient/GadgetTextEntry.h"
+#include "GameClient/GXExtrasValues.h"
 #include "GameLogic/GameLogic.h"
 #include <cstdlib>
 #include <cstring>
@@ -137,6 +139,41 @@ static const Int SLIDER_SCROLL_SPEED_MAX = 200;
 static const Int SLIDER_DRAW_DISTANCE_MIN = 100;
 static const Int SLIDER_DRAW_DISTANCE_MAX = 200;
 
+// GeneralsX @feature Codex 16/10/2026 Numeric edits and steppers share the slider draft.
+static Int s_exactLast[5]={-1,-1,-1,-1,-1};
+static const Int s_exactMin[5]={SLIDER_MAX_CAMERA_HEIGHT_MIN,50,20,1,100};
+static const Int s_exactMax[5]={SLIDER_MAX_CAMERA_HEIGHT_MAX,300,60,200,200};
+static const Int s_exactStep[5]={10*GX_EXTRA_CAMERA_SCALE,1,1,1,1};
+static const Int s_cameraPresets[4]={400,1000,2000,3600};
+static GameWindow *gxExactWindow(Int index,const char *suffix) {
+    AsciiString name;name.format("ExtrasMenu.wnd:Exact%d%s",index,suffix);
+    return TheWindowManager->winGetWindowFromId(nullptr,TheNameKeyGenerator->nameToKey(name));
+}
+static GameWindow *gxExactSlider(Int index) {
+    GameWindow *sliders[]={sliderMaxCameraHeight,sliderMinCameraHeight,sliderCameraPitch,sliderScrollSpeed,sliderDrawDistance};
+    return index>=0 && index<5 ? sliders[index] : nullptr;
+}
+static void gxSyncExactValues(Bool force=FALSE) {
+    for(Int i=0;i<5;++i) {
+        GameWindow *slider=gxExactSlider(i),*entry=gxExactWindow(i,"Value");
+        if(!slider||!entry)continue;
+        Int value=GXExtrasValues::normalize(GadgetSliderGetPosition(slider),s_exactMin[i],s_exactMax[i],i==0?GX_EXTRA_CAMERA_SCALE:1);
+        if(force || value!=s_exactLast[i]) {
+            UnicodeString text;text.format(L"%d",value);GadgetTextEntrySetText(entry,text);s_exactLast[i]=value;
+        }
+    }
+}
+static void gxCommitExactValue(Int i) {
+    GameWindow *entry=gxExactWindow(i,"Value"),*slider=gxExactSlider(i);
+    if(!entry||!slider)return;
+    UnicodeString text=GadgetTextEntryGetText(entry);Int value=0;
+    if(GXExtrasValues::digits(text.str(),text.getLength(),value)) {
+        value=GXExtrasValues::normalize(value,s_exactMin[i],s_exactMax[i],i==0?GX_EXTRA_CAMERA_SCALE:1);
+        GadgetSliderSetPosition(slider,value);
+    }
+    s_exactLast[i]=-1;
+}
+
 //-------------------------------------------------------------------------------------------------
 void ExtrasMenuInit(WindowLayout *layout, void *userData)
 {
@@ -200,11 +237,25 @@ void ExtrasMenuInit(WindowLayout *layout, void *userData)
         }
     }
 
+    for(Int i=0;i<5;++i) {
+        GameWindow *minus=gxExactWindow(i,"Minus"),*plus=gxExactWindow(i,"Plus");
+        if(minus)GadgetButtonSetText(minus,UnicodeString(L"−"));
+        if(plus)GadgetButtonSetText(plus,UnicodeString(L"+"));
+    }
+    for(Int i=0;i<4;++i) {
+        AsciiString name;name.format("ExtrasMenu.wnd:CameraPreset%d",i);
+        GameWindow *button=TheWindowManager->winGetWindowFromId(nullptr,TheNameKeyGenerator->nameToKey(name));
+        UnicodeString text;text.format(L"%d",s_cameraPresets[i]);
+        if(button)GadgetButtonSetText(button,text);
+    }
+    for(Int &value:s_exactLast)value=-1;
+    gxSyncExactValues(TRUE);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ExtrasMenuUpdate(WindowLayout *layout, void *userData)
 {
+    gxSyncExactValues();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -326,15 +377,40 @@ WindowMsgHandledType ExtrasMenuSystem(GameWindow *window, UnsignedInt msg,
 			return MSG_HANDLED;
 		}
 
+        case GEM_EDIT_DONE:
+            for(Int i=0;i<5;++i)if((GameWindow*)mData1==gxExactWindow(i,"Value")) {
+                gxCommitExactValue(i);gxSyncExactValues();return MSG_HANDLED;
+            }
+            break;
+
 		case GBM_SELECTED:
 		{
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
+            for(Int i=0;i<5;++i) {
+                GameWindow *minus=gxExactWindow(i,"Minus"),*plus=gxExactWindow(i,"Plus");
+                if(control==minus || control==plus) {
+                    gxCommitExactValue(i);
+                    GameWindow *slider=gxExactSlider(i);
+                    if(slider)GadgetSliderSetPosition(slider,GXExtrasValues::normalize(
+                        GadgetSliderGetPosition(slider)+(control==plus?s_exactStep[i]:-s_exactStep[i]),s_exactMin[i],s_exactMax[i],i==0?GX_EXTRA_CAMERA_SCALE:1));
+                    gxSyncExactValues();return MSG_HANDLED;
+                }
+            }
+            for(Int i=0;i<4;++i) {
+                AsciiString name;name.format("ExtrasMenu.wnd:CameraPreset%d",i);
+                if(controlID==TheNameKeyGenerator->nameToKey(name)) {
+                    GadgetSliderSetPosition(sliderMaxCameraHeight,GXExtrasValues::normalize(s_cameraPresets[i],s_exactMin[0],s_exactMax[0],GX_EXTRA_CAMERA_SCALE));
+                    gxSyncExactValues();return MSG_HANDLED;
+                }
+            }
+
 
 			if (controlID == buttonBack) {
 				CloseExtrasMenu();
 			}
 			else if (controlID == buttonAccept) {
+                for(Int i=0;i<5;++i)gxCommitExactValue(i);
 				saveExtras();
 				if (pref) {
 					pref->write();
@@ -343,6 +419,7 @@ WindowMsgHandledType ExtrasMenuSystem(GameWindow *window, UnsignedInt msg,
 			}
 			else if (controlID == buttonDefaults) {
 				setDefaults();
+                gxSyncExactValues(TRUE);
 			}
 			break;
 		}
