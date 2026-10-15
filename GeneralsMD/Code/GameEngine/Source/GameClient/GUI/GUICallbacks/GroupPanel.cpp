@@ -97,12 +97,60 @@
 #include "GameClient/GameFont.h"
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include "Common/GXTabletControls.h"
+#include "GameClient/DisplayString.h"
+#include "GameClient/DisplayStringManager.h"
 #include "GameClient/InGameUI.h"
 #include "GameLogic/GameLogic.h"
 
 // GeneralsX @feature Codex 14/10/2026 Explicit screen/map selection, on the game thread.
 static NameKeyType s_armyButtons[5] = { NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID };
 static Bool s_armyLabelsSet = FALSE;
+
+// GeneralsX @feature Codex 16/10/2026 Keep customization outside the legacy window ABI.
+static Bool s_armyCollapsed = FALSE;
+static UnsignedInt s_handlePress = 0;
+struct GXPanelFontState {
+    GameFont *base=nullptr;
+    Int width=0,height=0;
+    UnicodeString text;
+};
+static std::map<GameWindow*,GXPanelFontState> s_panelFonts;
+static void gxStylePanelButton(GameWindow *button, Int width, Int height)
+{
+    if(!button)return;
+    const auto &settings=GXTabletControls::get();
+    auto &state=s_panelFonts[button];
+    if(!state.base)state.base=button->winGetFont();
+    UnicodeString text=button->winGetText();
+    if(state.width==width && state.height==height && state.text==text)return;
+    state.width=width;state.height=height;state.text=text;
+    Int alpha=255*settings.panelOpacity/100;
+    button->winSetEnabledColor(0,GameMakeColor(14,27,37,alpha));
+    button->winSetDisabledColor(0,GameMakeColor(14,27,37,alpha));
+    button->winSetHiliteColor(0,GameMakeColor(30,53,70,alpha));
+    button->winSetEnabledBorderColor(0,GameMakeColor(150,134,85,alpha));
+    button->winSetDisabledBorderColor(0,GameMakeColor(90,90,90,alpha));
+    button->winSetHiliteBorderColor(0,GameMakeColor(220,200,115,alpha));
+    if(!state.base || !TheFontLibrary)return;
+    Int target=max(1,state.base->pointSize*settings.panelScale/100);
+    GameFont *font=TheFontLibrary->getFont(state.base->nameString,target,state.base->bold);
+    if(settings.fitLabels && TheDisplayStringManager && TheDisplay) {
+        DisplayString *measure=TheDisplayStringManager->newDisplayString();
+        if(measure) {
+            measure->setText(text);measure->setWordWrap(0);
+            const Int smallest=max(8,(Int)(8*min(TheDisplay->getWidth()/800.0f,TheDisplay->getHeight()/600.0f)));
+            while(font && target>smallest) {
+                measure->setFont(font);Int w,h;measure->getSize(&w,&h);
+                if(w<=width-8 && h<=height-4)break;
+                --target;font=TheFontLibrary->getFont(state.base->nameString,target,state.base->bold);
+            }
+            TheDisplayStringManager->freeDisplayString(measure);
+        }
+    }
+    if(font)button->winSetFont(font);
+}
 
 static Bool canSelectArmy()
 {
@@ -464,19 +512,30 @@ void GroupPanelFollowControlBar(Int barScreenX, Int barScreenY, Bool visible)
     GameWindow *handle = TheWindowManager->winGetWindowFromId(nullptr, s_buttonHandleID);
     GameWindow *row = TheWindowManager->winGetWindowFromId(nullptr, s_groupRowID);
     if (!parent || !handle || !row) return;
+    const auto &settings=GXTabletControls::get();
+    Int visibleButtons=0;
+    for(Int i=0;i<5;++i)if(!s_armyCollapsed && (settings.panelMask&(1<<i)))++visibleButtons;
     const GXUiScale::Transform &bar = GXUiScale::forLayout("ControlBar.wnd");
     const GXArmyPanelLayout::Layout box = GXArmyPanelLayout::calculate(
         TheDisplay->getWidth(), TheDisplay->getHeight(), barScreenX, barScreenY,
-        GXSafeArea::leftPx(), GXSafeArea::bottomPx(), bar.fontK);
+        GXSafeArea::leftPx(), GXSafeArea::bottomPx(), bar.fontK,
+        settings.panelScale,settings.panelWidth,settings.panelLeft,settings.panelBottom,visibleButtons);
     Int px,py;
     parent->winGetScreenPosition(&px,&py);
     handle->winSetPosition(box.x-px,box.y-py);
     handle->winSetSize(box.width,box.height);
+    gxStylePanelButton(handle,box.width,box.height);
+    Int buttonRow=0;
     for (Int i=0;i<5;++i) {
         GameWindow *button = TheWindowManager->winGetWindowFromId(nullptr,s_armyButtons[i]);
         if (!button) continue;
-        button->winSetPosition(box.x-px,box.y+(i+1)*(box.height+box.gap)-py);
+        const Bool show=!s_armyCollapsed && (settings.panelMask&(1<<i));
+        button->winHide(!show);
+        if(!show)continue;
+        ++buttonRow;
+        button->winSetPosition(box.x-px,box.y+buttonRow*(box.height+box.gap)-py);
         button->winSetSize(box.width,box.height);
+        gxStylePanelButton(button,box.width,box.height);
     }
     row->winSetPosition(box.rowX-px,box.rowY-py);
     row->winSetSize(box.columns*box.cellWidth+(box.columns-1)*box.gap,
@@ -487,6 +546,7 @@ void GroupPanelFollowControlBar(Int barScreenX, Int barScreenY, Bool visible)
         button->winSetPosition((i%box.columns)*(box.cellWidth+box.gap),
             (i/box.columns)*(box.cellHeight+box.gap));
         button->winSetSize(box.cellWidth,box.cellHeight);
+        gxStylePanelButton(button,box.cellWidth,box.cellHeight);
     }
     fitParentToVisibleContent();
 }
@@ -496,6 +556,8 @@ void GroupPanelInit(WindowLayout *layout, void *userData)
 {
 	(void)layout;
 	(void)userData;
+	s_armyCollapsed = GXTabletControls::get().panelCollapsed;
+    s_handlePress=0;s_panelFonts.clear();
 	s_groundNextAcrossMap = FALSE;
 	s_groundSelectionRevision = TheInGameUI ? TheInGameUI->getSelectionRevision() : 0;
 }
@@ -506,6 +568,12 @@ void GroupPanelUpdate(WindowLayout *layout, void *userData)
 	(void)layout;
 	(void)userData;
 	updateHoldVisuals();
+    if(TheWindowManager) {
+        GameWindow *handle=TheWindowManager->winGetWindowFromId(nullptr,s_buttonHandleID);
+        if(handle && BitIsSet(handle->winGetInstanceData()->getState(),WIN_STATE_SELECTED)) {
+            if(!s_handlePress)s_handlePress=timeGetTime();
+        } else s_handlePress=0;
+    }
     if (!TheWindowManager) return;
     const Bool enabled = canSelectArmy();
     for (Int i=0; i<5; ++i) {
@@ -537,6 +605,7 @@ void GroupPanelUpdate(WindowLayout *layout, void *userData)
 //-------------------------------------------------------------------------------------------------
 void GroupPanelShutdown(WindowLayout *layout, void *userData)
 {
+    s_panelFonts.clear();s_handlePress=0;
 	(void)userData;
 	if (layout) {
 		layout->hide(TRUE);
@@ -579,6 +648,9 @@ WindowMsgHandledType GroupPanelSystem(GameWindow *window, UnsignedInt msg,
 		{
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
+            if(controlID==s_buttonHandleID && s_handlePress && timeGetTime()-s_handlePress>=GROUP_HOLD_MS) {
+                s_armyCollapsed=!s_armyCollapsed;s_handlePress=0;return MSG_HANDLED;
+            }
 
             if (controlID == s_armyButtons[4]) { selectGroundArmy(); return MSG_HANDLED; }
             if (controlID == s_armyButtons[2] || controlID == s_armyButtons[3]) {
@@ -619,6 +691,7 @@ WindowMsgHandledType GroupPanelSystem(GameWindow *window, UnsignedInt msg,
 		{
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
+            if(controlID==s_buttonHandleID) { s_armyCollapsed=!s_armyCollapsed;return MSG_HANDLED; }
 
 			Int group = findGroupButtonIndex(controlID);
 			if (group >= 0) {
