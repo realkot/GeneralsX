@@ -12,3 +12,5 @@
 Package `com.generalsx.zerohour.inputtest`, version `1.4.1-inputtest.20261016-r10`, code `10310`. Retain the right HUD and six HD panel atlases. No renderer or AI behavior changes; the high-camera strip and Satellite Hack 2 are not claimed fixed.
 
 This candidate awaits explicit owner testing. Main remains r9 until acceptance. Supply original game data separately and back up settings/saves before replacing an installed version.
+
+Validation: both engines built, 49 Android tests and host regressions passed; 30/60 Hz skirmishes launched in MuMu. Actual tablet/mouse acceptance remains pending.

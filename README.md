@@ -1,5 +1,7 @@
 # GeneralsX [mod by realkot]
 
+> **Кандидат r10 для проверки:** [скачать APK](https://github.com/realkot/GeneralsX/releases/download/inputtest-20261016-r10/GeneralsZH-InputTest-20261016-r10.apk) · [изменения и проверка](docs/WORKDIR/reports/ANDROID_INPUT_TEST_R10.md). Настраиваемые кнопки армии и курсор, переключатель атаки в движении, точные значения Extras, диагностика мыши. Main остаётся на r9 до подтверждения теста пользователем.
+
 Android-порт **Command & Conquer: Generals Zero Hour** с доработками управления на планшете, интерфейса и удобства игры. Актуальная тестовая версия — **r9**.
 
 **[Скачать APK r9](https://github.com/realkot/GeneralsX/releases/download/inputtest-20261015-r9/GeneralsZH-InputTest-20261015-r9.apk)** · [Все сборки и история изменений](https://github.com/realkot/GeneralsX/releases) · [Краткий changelog](CHANGELOG_RU.md) · [English changelog](CHANGELOG_EN.md)

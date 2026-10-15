@@ -5,5 +5,23 @@
   "releaseBranch": "release/1.4.1-inputtest-r10",
   "baseline": "9e372c9c0d09574fda8797cb1b9435c917858f99",
   "status": "awaiting_owner_test",
-  "ownerApproved": false
+  "ownerApproved": false,
+  "apk": "GeneralsZH-InputTest-20261016-r10.apk",
+  "sha256": "6679950d40b678244a639da8b41ef630488bbdcc240709c3b4b9271a438aec37",
+  "bytes": 87157508,
+  "nativeSourceCommit": "38b74206b6ac0e91b29654a3d4c5c88546a27d79",
+  "buildValidation": "passed",
+  "androidTests": {
+    "tests": 49,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "emulatorChecks": [
+    "30Hz skirmish and Extras",
+    "60Hz skirmish, libmain60.so confirmed",
+    "launcher controls and private trace viewer",
+    "focus loss and resume",
+    "original emulator settings restored"
+  ]
 }
