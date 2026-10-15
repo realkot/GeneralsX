@@ -84,12 +84,12 @@ engines must be built from the same working tree — if a source edit lands
 between the two passes, the APK carries two engines that differ in more than
 the tick rate.
 
-Work and push on the diagnostics branch (`claude/network-diagnostics`), never directly on
-`main`: `main` only accumulates confirmed results, and is fast-forwarded to the branch when the
-repository owner says so.
-
-Keep only the current build in `apk/`: `git rm` the previous APK when adding a new one. Every
-APK is ~60 MB of permanent git history.
+Owner policy updated 16/10/2026: develop on `codex/<feature>`, build test APKs
+from `release/<version>` and automatically push completed commits. Never merge
+into main until the owner explicitly confirms successful testing of that exact
+candidate. See `docs/HOWTO/RELEASE_POLICY.md`, which supersedes inherited branch,
+cleanup and release examples below. Preserve older APKs and the entire build
+environment; deletion/recreation requires separate owner permission.
 
 **Give the user the APK link first, at the top of the reply, not at the end.**
 
