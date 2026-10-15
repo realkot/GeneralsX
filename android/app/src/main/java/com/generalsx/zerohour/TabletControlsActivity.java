@@ -88,7 +88,7 @@ public final class TabletControlsActivity extends Activity {
         ThemeHelper.applyBars(this);
     }
     private void showLog() {
-        File dir=getExternalFilesDir(null);
+        File dir=getFilesDir();
         File log=dir==null?null:new File(dir,"gx_input_trace.log");
         String text=getString(R.string.tablet_no_log);
         if(log!=null && log.isFile()) {

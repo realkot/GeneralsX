@@ -14,11 +14,20 @@ inline bool enabled() {
     }();
     return active;
 }
+inline const char *path() {
+#if defined(__ANDROID__)
+    static char value[256]={};
+    if(!value[0])snprintf(value,sizeof(value),"/data/user/%d/" GX_ANDROID_APP_ID "/files/gx_input_trace.log",(int)(getuid()/100000));
+    return value;
+#else
+    return "gx_input_trace.log";
+#endif
+}
 inline void record(const char *stage,const char *format,...) {
     if (!enabled()) return;
-    FILE *file=fopen("gx_input_trace.log","a+");if (!file) return;
+    FILE *file=fopen(path(),"a+");if (!file) return;
     if (fseek(file,0,SEEK_END)==0 && ftell(file)>512*1024) {
-        fclose(file);file=fopen("gx_input_trace.log","w");if (!file)return;
+        fclose(file);file=fopen(path(),"w");if (!file)return;
         fputs("[trace wrapped at 512 KiB]\n",file);
     }
     const auto now=std::chrono::duration_cast<std::chrono::milliseconds>(
