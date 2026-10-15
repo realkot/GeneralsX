@@ -9,5 +9,12 @@ app/src/main/java-sdl/
 app/src/main/assets/gamedata/*
 !app/src/main/assets/gamedata/Window/
 !app/src/main/assets/gamedata/Window/**
+# Owned optional HUD reconstructions; keep all other staged retail assets ignored.
+!app/src/main/assets/gamedata/Art/
+app/src/main/assets/gamedata/Art/*
+!app/src/main/assets/gamedata/Art/Textures/
+app/src/main/assets/gamedata/Art/Textures/*
+!app/src/main/assets/gamedata/Art/Textures/gx_hd_*.tga
+!app/src/main/assets/gamedata/Art/Textures/gx_hd_manifest.txt
 app/src/main/assets/default_driver/
 app/src/main/assets/engine_build.txt

@@ -41,6 +41,15 @@
 #include <SDL3_image/SDL_image.h>
 // GeneralsX @bugfix BenderAI 22/02/2026 Add array header for AnimatedCursor
 #include <array>
+#if (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || defined(__ANDROID__)
+// GeneralsX @feature Android port 05/10/2026 The touchpad pointer is drawn by the game (draw()).
+#include "Common/GXMouseMode.h"
+#include "GameClient/InGameUI.h"
+#include <math.h>
+#include "GameClient/Image.h"
+#include "WW3D2/surfaceclass.h"
+#include "WW3D2/texture.h"
+#endif
 // GeneralsX @bugfix BenderAI 22/02/2026 Add file system includes for cursor loading
 #include "Common/Debug.h"
 #include "Common/file.h"
@@ -55,9 +64,25 @@ struct AnimatedCursor {
 	std::array<SDL_Surface*, MAX_2D_CURSOR_ANIM_FRAMES> m_frameSurfaces;
 	int m_frameCount = 0;
 	int m_frameRate = 0; // the time a frame is displayed in 1/60th of a second
+	// GeneralsX @feature Android port 05/10/2026 Hot spot of the frames, and the frames as images
+	// the game can draw (SDL3Mouse::draw(), touchpad pointer). Made on first use.
+	int m_hotX = 0;
+	int m_hotY = 0;
+#if (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || defined(__ANDROID__)
+	std::array<Image*, MAX_2D_CURSOR_ANIM_FRAMES> m_gxImages = {};
+	std::array<TextureClass*, MAX_2D_CURSOR_ANIM_FRAMES> m_gxTextures = {};
+#endif
 
 	~AnimatedCursor()
 	{
+#if (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || defined(__ANDROID__)
+		for (int i = 0; i < MAX_2D_CURSOR_ANIM_FRAMES; i++)
+		{
+			if (m_gxImages[i])
+				deleteInstance(m_gxImages[i]);
+			REF_PTR_RELEASE(m_gxTextures[i]);
+		}
+#endif
 		if (m_cursor)
 		{
 			SDL_DestroyCursor(m_cursor);
@@ -128,26 +153,36 @@ static void* getChunkData(RIFFChunk* chunk)
  * Constructor - Initialize SDL3Mouse with window handle
  * @param window SDL3 window handle (required for mouse capture)
  */
+// GeneralsX @bugfix Codex 15/10/2026 A lazy singleton queue keeps SDL3Mouse's legacy field offsets intact.
+static std::deque<SDL_Event>& gxMousePendingEvents()
+{
+	static std::deque<SDL_Event> events;
+	return events;
+}
+
 SDL3Mouse::SDL3Mouse(SDL_Window* window)
 	: Mouse(),
+	  m_nextFreeIndex(0),
+	  m_nextGetIndex(0),
 	  m_Window(window),
 	  m_IsCaptured(false),
 	  m_IsVisible(true),
 	  m_LostFocus(false),           // GeneralsX @bugfix felipebraz 18/02/2026 Initialize focus state
-	  m_nextFreeIndex(0),   // Fighter19 pattern: write position for new events
-	  m_nextGetIndex(0),    // Fighter19 pattern: read position for events
 	  m_LeftButtonDownTime(0),
 	  m_RightButtonDownTime(0),
 	  m_MiddleButtonDownTime(0),
 	  m_LastFrameNumber(0),  // GeneralsX @bugfix felipebraz 18/02/2026 Initialize frame tracking
-	  m_directionFrame(0)    // GeneralsX @bugfix BenderAI 22/02/2026 Initialize cursor direction frame
+	  m_directionFrame(0),    // GeneralsX @bugfix BenderAI 22/02/2026 Initialize cursor direction frame
+	  m_touchpadPointer(FALSE)
 {
+	memset(m_eventBuffer, 0, sizeof(m_eventBuffer));
+	auto &m_pendingEvents = gxMousePendingEvents();
 	// GeneralsX @bugfix BenderAI 18/02/2026 Temporarily disable debug logging (Phase 1.8)
 	// fprintf(stderr, "DEBUG: SDL3Mouse::SDL3Mouse() created\n");
 
 	// Initialize event buffer with SDL_EVENT_FIRST sentinel (means "empty" slot)
 	// GeneralsX @refactor felipebraz 16/02/2026 Fighter19 pattern
-	memset(m_eventBuffer, 0, sizeof(m_eventBuffer));
+	m_pendingEvents.clear();
 
 	m_LeftButtonDownPos.x = 0;
 	m_LeftButtonDownPos.y = 0;
@@ -305,8 +340,51 @@ AnimatedCursor* SDL3Mouse::loadCursorFromFile(const char* filepath)
 				}
 				#endif
 
+#ifdef __ANDROID__
+				// GeneralsX @tweak Codex 15/10/2026 Double physical mouse cursor art and
+				// its hot spot together so tablet pointers remain visible without shifting clicks.
+				bool enlarged = true;
+				SDL_Surface *largeFrames[MAX_2D_CURSOR_ANIM_FRAMES] = {};
+				for (int i = 0; i < frame_index; ++i) {
+					SDL_Surface *source = cursor->m_frameSurfaces[i];
+					largeFrames[i] = SDL_ScaleSurface(source, source->w * 2, source->h * 2, SDL_SCALEMODE_NEAREST);
+					if (!largeFrames[i]) enlarged = false;
+				}
+				for (int i = 0; i < frame_index; ++i) {
+					if (enlarged) {
+						frame_infos[i].surface = largeFrames[i];
+					} else if (largeFrames[i]) {
+						SDL_DestroySurface(largeFrames[i]);
+						largeFrames[i] = nullptr;
+					}
+				}
+				if (enlarged) {
+					hot_spot_x *= 2;
+					hot_spot_y *= 2;
+				}
+#endif
+				cursor->m_hotX = hot_spot_x;
+				cursor->m_hotY = hot_spot_y;
+#ifdef __ANDROID__
+				// The software touchpad renderer still uses the original surfaces.
+				if (enlarged) {
+					cursor->m_hotX /= 2;
+					cursor->m_hotY /= 2;
+				}
+#endif
 				// GeneralsX @bugfix felipebraz 28/04/2026 Use SDL native animated cursor to ensure frame playback.
 				cursor->m_cursor = SDL_CreateAnimatedCursor(frame_infos, frame_index, hot_spot_x, hot_spot_y);
+#ifdef __ANDROID__
+				if (!cursor->m_cursor && enlarged) {
+					cursor->m_cursor = SDL_CreateColorCursor(largeFrames[0], hot_spot_x, hot_spot_y);
+				}
+				for (int i = 0; i < frame_index; ++i) {
+					if (largeFrames[i]) SDL_DestroySurface(largeFrames[i]);
+				}
+				// Keep the original-size fallback's hot spot consistent if scaling failed.
+				hot_spot_x = cursor->m_hotX;
+				hot_spot_y = cursor->m_hotY;
+#endif
 				if (!cursor->m_cursor)
 				{
 					DEBUG_LOG(("SDL3Mouse::loadCursorFromFile: SDL_CreateAnimatedCursor failed [%s]", SDL_GetError()));
@@ -360,6 +438,7 @@ AnimatedCursor* SDL3Mouse::loadCursorFromFile(const char* filepath)
  */
 void SDL3Mouse::init(void)
 {
+	auto &m_pendingEvents = gxMousePendingEvents();
 	// GeneralsX @bugfix BenderAI 18/02/2026 Temporarily disable debug logging (Phase 1.8)
 	// fprintf(stderr, "INFO: SDL3Mouse::init()\n");
 
@@ -380,9 +459,7 @@ void SDL3Mouse::init(void)
 
 	// Clear event buffer - Fighter19 pattern
 	// GeneralsX @refactor felipebraz 16/02/2026
-	memset(m_eventBuffer, 0, sizeof(m_eventBuffer));
-	m_nextFreeIndex = 0;
-	m_nextGetIndex = 0;
+	m_pendingEvents.clear();
 
 	// GeneralsX @bugfix BenderAI 18/02/2026 Temporarily disable debug logging (Phase 1.8)
 	// fprintf(stderr, "INFO: SDL3Mouse::init() complete\n");
@@ -393,6 +470,8 @@ void SDL3Mouse::init(void)
  */
 void SDL3Mouse::reset(void)
 {
+	auto &m_pendingEvents = gxMousePendingEvents();
+	cancelInput();
 	// GeneralsX @bugfix BenderAI 18/02/2026 Temporarily disable debug logging (Phase 1.8)
 	// fprintf(stderr, "DEBUG: SDL3Mouse::reset()\n");
 
@@ -404,9 +483,7 @@ void SDL3Mouse::reset(void)
 
 	// Clear event buffer - Fighter19 pattern
 	// GeneralsX @refactor felipebraz 16/02/2026
-	memset(m_eventBuffer, 0, sizeof(m_eventBuffer));
-	m_nextFreeIndex = 0;
-	m_nextGetIndex = 0;
+	m_pendingEvents.clear();
 }
 
 /**
@@ -414,6 +491,9 @@ void SDL3Mouse::reset(void)
  */
 void SDL3Mouse::update(void)
 {
+	Real scaleX, scaleY;
+	getPointerClickToleranceScale(scaleX, scaleY);
+	Mouse::setClickToleranceScale(scaleX, scaleY);
 	// Call parent update (processes events, updates m_currMouse)
 	Mouse::update();
 }
@@ -515,6 +595,8 @@ void SDL3Mouse::setVisibility(Bool visible)
  */
 void SDL3Mouse::loseFocus()
 {
+	cancelInput();
+	m_physicalPointer = FALSE;
 	m_LostFocus = true;           // GeneralsX @bugfix felipebraz 18/02/2026 Set focus flag
 	releaseCapture();
 }
@@ -536,6 +618,7 @@ void SDL3Mouse::regainFocus()
 // hover, scrolling, selection or clicking changes.
 void SDL3Mouse::setTouchCursorPos(Int x, Int y)
 {
+	if (m_physicalPointer) return;
 	m_currMouse.pos.x = x;
 	m_currMouse.pos.y = y;
 }
@@ -550,12 +633,204 @@ void SDL3Mouse::setTouchCursorPos(Int x, Int y)
  */
 void SDL3Mouse::createStreamMessages()
 {
+	// GeneralsX @bugfix Codex 14/10/2026 Only real hardware owns the persistent pointer heartbeat.
+	if ((m_physicalPointer || GXMouseModeEnabled()) && !m_LostFocus && !m_streamSuppressed) Mouse::createStreamMessages();
+}
+
+// GeneralsX @feature Android port 05/10/2026 One cursor frame as an image the display can draw:
+// the ICO frame SDL_image decoded, copied into a texture the size rounded up to a power of two.
+static Image *gxCursorFrameImage(SDL_Surface *frame, TextureClass **outTexture)
+{
+	SDL_Surface *argb = SDL_ConvertSurface(frame, SDL_PIXELFORMAT_ARGB8888);
+	if (argb == nullptr) {
+		return nullptr;
+	}
+	int texW = 1, texH = 1;
+	while (texW < argb->w) texW <<= 1;
+	while (texH < argb->h) texH <<= 1;
+
+	TextureClass *texture = MSGNEW("TextureClass") TextureClass(texW, texH, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_1);
+	SurfaceClass *surface = texture ? texture->Get_Surface_Level() : nullptr;
+	int pitch = 0;
+	UnsignedByte *bits = (surface && surface->Get_Bytes_Per_Pixel() == 4) ? (UnsignedByte *)surface->Lock(&pitch) : nullptr;
+	if (bits == nullptr) {
+		REF_PTR_RELEASE(surface);
+		REF_PTR_RELEASE(texture);
+		SDL_DestroySurface(argb);
+		return nullptr;
+	}
+	for (int y = 0; y < texH; ++y) {
+		UnsignedInt *row = (UnsignedInt *)(bits + y * pitch);
+		const UnsignedInt *src = (y < argb->h) ? (const UnsignedInt *)((const UnsignedByte *)argb->pixels + y * argb->pitch) : nullptr;
+		for (int x = 0; x < texW; ++x) {
+			row[x] = (src != nullptr && x < argb->w) ? src[x] : 0;
+		}
+	}
+	surface->Unlock();
+	REF_PTR_RELEASE(surface);
+
+	Image *image = newInstance(Image);
+	image->setName("GXTouchpadCursor");
+	image->setStatus(IMAGE_STATUS_RAW_TEXTURE);
+	image->setRawTextureData(texture);
+	Region2D uv;
+	uv.lo.x = 0.0f;
+	uv.lo.y = 0.0f;
+	uv.hi.x = (Real)argb->w / texW;
+	uv.hi.y = (Real)argb->h / texH;
+	image->setUV(&uv);
+	image->setTextureWidth(texW);
+	image->setTextureHeight(texH);
+	ICoord2D size;
+	size.x = argb->w;
+	size.y = argb->h;
+	image->setImageSize(&size);
+	SDL_DestroySurface(argb);
+	*outTexture = texture;
+	return image;
+}
+
+/**
+ * GeneralsX @feature Android port 05/10/2026 Draw the touchpad pointer (issue #39).
+ *
+ * Android draws a pointer only for a real mouse. A finger moving the cursor is no mouse to it, so
+ * while the last pointer input came from the touchpad the game draws the cursor itself, after the
+ * interface, with the cursor the game chose (attack, move, sell, ...) and its own hot spot. The
+ * cursor files are 32 pixels; scaled up with the screen's height so it stays visible on a phone.
+ */
+void SDL3Mouse::draw()
+{
+	Mouse::draw();
+	if (!GXMouseModeEnabled() || !m_touchpadPointer || TheDisplay == nullptr) {
+		return;
+	}
+	if (m_currentCursor == NONE) {
+		return;	// the game hides the pointer (movies, cinematics)
+	}
+
+	// GeneralsX @bugfix Android port 05/10/2026 The scroll cursor points where the view moves
+	// (owner: "the arrows always point right"). Nothing set the direction on this platform; this
+	// is W3DMouse::setCursorDirection's rule: frame 0 points right, the rest go clockwise.
+	if (m_currentCursor >= FIRST_CURSOR && m_currentCursor < NUM_MOUSE_CURSORS) {
+		const Int numDirections = m_cursorInfo[m_currentCursor].numDirections;
+		m_directionFrame = 0;
+		if (numDirections > 1 && TheInGameUI != nullptr && TheInGameUI->isScrolling()) {
+			Coord2D offset = TheInGameUI->getScrollAmount();
+			if (offset.x != 0.0f || offset.y != 0.0f) {
+				Real theta = atan2f(offset.y, offset.x);
+				theta = fmodf(theta + PI * 2.0f, PI * 2.0f);
+				m_directionFrame = (Int)(theta / (2.0f * PI / (Real)numDirections) + 0.5f);
+				if (m_directionFrame >= numDirections || m_directionFrame >= MAX_2D_CURSOR_DIRECTIONS) {
+					m_directionFrame = 0;
+				}
+			}
+		}
+	}
+
+	AnimatedCursor *cursor = nullptr;
+	if (m_currentCursor >= FIRST_CURSOR && m_currentCursor < NUM_MOUSE_CURSORS &&
+	    m_directionFrame >= 0 && m_directionFrame < MAX_2D_CURSOR_DIRECTIONS) {
+		cursor = cursorResources[m_currentCursor][m_directionFrame];
+	}
+	if (cursor == nullptr || cursor->m_frameCount <= 0) {
+		cursor = cursorResources[NORMAL][0];
+	}
+
+	// GeneralsX @tweak Codex 14/10/2026 Retain the touchpad cursor-size control.
+	Real scale = (Real)TheDisplay->getHeight() / 600.0f * 0.8f;
+	const char *uiScale = getenv("GX_UI_SCALE");
+	if (uiScale && atoi(uiScale) > 0) scale *= (Real)atoi(uiScale) / 100.0f;
+	scale *= (Real)GXMouseCursorPercent() / 100.0f;
+	if (scale < 0.5f) scale = 0.5f;
+	if (scale > 6.0f) scale = 6.0f;
+	const Int x = m_currMouse.pos.x;
+	const Int y = m_currMouse.pos.y;
+
+	if (cursor != nullptr && cursor->m_frameCount > 0) {
+		const Uint64 rate = cursor->m_frameRate > 0 ? (Uint64)cursor->m_frameRate : 4;
+		int frame = (int)(((SDL_GetTicks() * 60 / 1000) / rate) % (Uint64)cursor->m_frameCount);
+		if (frame < 0 || frame >= MAX_2D_CURSOR_ANIM_FRAMES || cursor->m_frameSurfaces[frame] == nullptr) {
+			frame = 0;
+		}
+		if (cursor->m_gxImages[frame] == nullptr && cursor->m_frameSurfaces[frame] != nullptr) {
+			cursor->m_gxImages[frame] = gxCursorFrameImage(cursor->m_frameSurfaces[frame], &cursor->m_gxTextures[frame]);
+		}
+		const Image *image = cursor->m_gxImages[frame];
+		if (image != nullptr) {
+			const Int w = (Int)(image->getImageWidth() * scale);
+			const Int h = (Int)(image->getImageHeight() * scale);
+			const Int left = x - (Int)(cursor->m_hotX * scale);
+			const Int top = y - (Int)(cursor->m_hotY * scale);
+			TheDisplay->drawImage(image, left, top, left + w, top + h);
+			return;
+		}
+	}
+
+	// No cursor art: a plain cross, so the pointer is never invisible.
+	const Int r = (Int)(10 * scale);
+	TheDisplay->drawLine(x - r, y, x + r, y, 2.0f * scale, 0xFFFFFFFF);
+	TheDisplay->drawLine(x, y - r, x, y + r, 2.0f * scale, 0xFFFFFFFF);
 }
 #endif
 
 /**
  * Capture mouse (confine to window)
  */
+void SDL3Mouse::cancelInput()
+{
+	auto &m_pendingEvents = gxMousePendingEvents();
+	const ICoord2D pos = m_currMouse.pos;
+	m_pendingEvents.clear();
+	memset(m_mouseEvents, 0, sizeof(m_mouseEvents));
+	memset(&m_currMouse, 0, sizeof(m_currMouse));
+	memset(&m_prevMouse, 0, sizeof(m_prevMouse));
+	m_currMouse.pos = m_prevMouse.pos = pos;
+	m_currMouse.leftState = m_currMouse.rightState = m_currMouse.middleState = MBS_Up;
+	m_prevMouse = m_currMouse;
+	m_eventsThisFrame = 0;
+	m_wheelRemainder = 0;
+	m_streamSuppressed = FALSE;
+	releaseCapture();
+}
+// GeneralsX @bugfix Codex 14/10/2026 Hardware and virtual touchpad hover both aim previews.
+Bool SDL3Mouse::hasContinuousPointer() const
+{
+#if defined(__ANDROID__) || (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
+    return m_physicalPointer || GXMouseModeEnabled();
+#else
+    return TRUE;
+#endif
+}
+
+// GeneralsX @input Codex 15/10/2026 Match the same viewport transform used by scaleMouseCoordinates.
+void SDL3Mouse::getPointerClickToleranceScale(Real &x, Real &y) const
+{
+    x = y = 1.0f;
+    if (!hasContinuousPointer() || !m_Window || !TheDisplay) return;
+    int width = 0, height = 0;
+    SDL_GetWindowSize(m_Window, &width, &height);
+    int px, py, pw, ph;
+    if (TheDisplay->getViewportRect(px, py, pw, ph) && pw > 0 && ph > 0) { width = pw; height = ph; }
+    if (width > 0 && height > 0 && TheDisplay->getWidth() > 0 && TheDisplay->getHeight() > 0) {
+        x = (Real)TheDisplay->getWidth() / (Real)width;
+        y = (Real)TheDisplay->getHeight() / (Real)height;
+    }
+}
+
+void SDL3Mouse::setPhysicalPointer(Bool active)
+{
+	if (m_physicalPointer == active) return;
+	cancelInput();
+	m_physicalPointer = active;
+	if (active) {
+		float x = 0, y = 0;
+		SDL_GetMouseState(&x, &y);
+		scaleMouseCoordinates((Int)x, (Int)y, SDL_GetWindowID(m_Window), m_currMouse.pos.x, m_currMouse.pos.y);
+		m_prevMouse.pos = m_currMouse.pos;
+		SDL_ShowCursor();
+	}
+}
+
 void SDL3Mouse::capture(void)
 {
 	if (!m_Window || m_IsCaptured) {
@@ -606,22 +881,12 @@ void SDL3Mouse::releaseCapture(void)
  */
 UnsignedByte SDL3Mouse::getMouseEvent(MouseIO *result, Bool flush)
 {
-	// Check if buffer is empty: if event type is SDL_EVENT_FIRST (0), slot is empty
-	// GeneralsX @refactor felipebraz 16/02/2026 Fighter19 pattern: raw SDL_Event with sentinel
-	if (m_eventBuffer[m_nextGetIndex].type == SDL_EVENT_FIRST) {
-		return MOUSE_NONE;
-	}
-
-	// Translate SDL_Event to MouseIO
-	// GeneralsX @refactor felipebraz 16/02/2026 Use unified translateEvent()
-	translateEvent(m_nextGetIndex, result);
-
-	// Mark this slot as empty (sentinel)
-	m_eventBuffer[m_nextGetIndex].type = SDL_EVENT_FIRST;
-
-	// Advance read position (circular buffer)
-	m_nextGetIndex = (m_nextGetIndex + 1) % MAX_SDL3_MOUSE_EVENTS;
-
+	auto &m_pendingEvents = gxMousePendingEvents();
+	if (!result || m_pendingEvents.empty()) return MOUSE_NONE;
+	const SDL_Event event = m_pendingEvents.front();
+	m_pendingEvents.pop_front();
+	memset(result, 0, sizeof(*result));
+	translateEvent(event, result);
 	return MOUSE_OK;
 }
 
@@ -782,7 +1047,11 @@ void SDL3Mouse::translateWheelEvent(const SDL_MouseWheelEvent& event, MouseIO *r
 
 	// SDL3 wheel: positive = up/away, negative = down/toward user
 	// Multiply by MOUSE_WHEEL_DELTA (120) to match Windows behavior
-	result->wheelPos = (Int)(event.y * MOUSE_WHEEL_DELTA);
+	// GeneralsX @bugfix Codex 14/10/2026 Preserve sub-unit deltas and normalize flipped wheels.
+	m_wheelRemainder += event.y * MOUSE_WHEEL_DELTA *
+		(event.direction == SDL_MOUSEWHEEL_FLIPPED ? -1.0f : 1.0f);
+	result->wheelPos = (Int)m_wheelRemainder;
+	m_wheelRemainder -= result->wheelPos;
 
 	result->leftState = MBS_None;
 	result->rightState = MBS_None;
@@ -822,7 +1091,7 @@ void SDL3Mouse::scaleMouseCoordinates(int rawX, int rawY, Uint32 windowID, int& 
 	int internalHeight = TheDisplay->getHeight();
 
 	int pbX, pbY, pbW, pbH;
-	if (TheDisplay->getViewportRect(pbX, pbY, pbW, pbH)) {
+	if (TheDisplay->getViewportRect(pbX, pbY, pbW, pbH) && pbW > 0 && pbH > 0) {
 		int clampedX = rawX - pbX;
 		if (clampedX < 0) clampedX = 0;
 		if (clampedX > pbW) clampedX = pbW;
@@ -852,6 +1121,7 @@ void SDL3Mouse::scaleMouseCoordinates(int rawX, int rawY, Uint32 windowID, int& 
  */
 void SDL3Mouse::addSDLEvent(SDL_Event *event)
 {
+	auto &m_pendingEvents = gxMousePendingEvents();
 	if (!event) {
 		return;
 	}
@@ -864,22 +1134,29 @@ void SDL3Mouse::addSDLEvent(SDL_Event *event)
 		return;  // Not a mouse event, ignore
 	}
 
-	// Check if buffer is full
-	UnsignedInt nextFreeIndex = (m_nextFreeIndex + 1) % MAX_SDL3_MOUSE_EVENTS;
-	if (nextFreeIndex == m_nextGetIndex) {
-		// GeneralsX @bugfix BenderAI 18/02/2026 Temporarily disable debug logging (Phase 1.8)
-		// fprintf(stderr, "WARNING: SDL3Mouse::addSDLEvent() buffer full (dropped event)\n");
-		return;
+#if (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || defined(__ANDROID__)
+	// GeneralsX @feature Android port 05/10/2026 Whose pointer it is now: the touchpad's (drawn by
+	// the game) or a real mouse's (drawn by Android).
+	if (event->type == SDL_EVENT_MOUSE_MOTION) {
+		m_touchpadPointer = (event->motion.which == TOUCHPAD_MOUSE_ID);
+	} else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+		m_touchpadPointer = (event->button.which == TOUCHPAD_MOUSE_ID);
 	}
+#endif
 
-	// Copy entire event to buffer
-	m_eventBuffer[m_nextFreeIndex] = *event;
-
-	// GeneralsX @bugfix BenderAI 18/02/2026 Temporarily disable debug logging (Phase 1.8)
-	// fprintf(stderr, "DEBUG: SDL3Mouse::addSDLEvent() type=%u index=%u\n", event->type, m_nextFreeIndex);
-
-	// Advance write position (circular buffer)
-	m_nextFreeIndex = nextFreeIndex;
+	// GeneralsX @bugfix Codex 14/10/2026 Do not coalesce across a press, release or source change.
+	if (event->type == SDL_EVENT_MOUSE_MOTION && !m_pendingEvents.empty()) {
+		SDL_Event &last = m_pendingEvents.back();
+		if (last.type == SDL_EVENT_MOUSE_MOTION && last.motion.which == event->motion.which
+			&& last.motion.windowID == event->motion.windowID && last.motion.state == event->motion.state) {
+			const float dx = last.motion.xrel + event->motion.xrel;
+			const float dy = last.motion.yrel + event->motion.yrel;
+			last = *event;
+			last.motion.xrel = dx; last.motion.yrel = dy;
+			return;
+		}
+	}
+	m_pendingEvents.push_back(*event);
 }
 
 /**
@@ -891,13 +1168,12 @@ void SDL3Mouse::addSDLEvent(SDL_Event *event)
  *
  * GeneralsX @refactor felipebraz 16/02/2026 Unified translation
  */
-void SDL3Mouse::translateEvent(UnsignedInt eventIndex, MouseIO *result)
+void SDL3Mouse::translateEvent(const SDL_Event &event, MouseIO *result)
 {
-	if (eventIndex >= MAX_SDL3_MOUSE_EVENTS || !result) {
+	if (!result) {
 		return;
 	}
 
-	const SDL_Event& event = m_eventBuffer[eventIndex];
 
 	// Raw window-pixel coordinates and window ID, extracted per event type
 	int rawX = 0, rawY = 0;

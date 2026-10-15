@@ -25817,3 +25817,44 @@ GUI:BeaconClear
 "지우기"
 END
 
+
+// Android army selection buttons
+GUI:ArmyScreen
+"군대: 화면"
+END
+
+GUI:ArmyMap
+"군대: 지도"
+END
+
+// GeneralsX @feature Codex 14/10/2026 Combat aviation selection
+GUI:ArmyPlanes
+"전투기"
+END
+
+GUI:ArmyHelicopters
+"헬리콥터"
+END
+
+
+// GeneralsX @selection Codex 14/10/2026 Compact vertical army labels.
+GUI:ArmyScreenShort
+"화면"
+END
+
+GUI:ArmyMapShort
+"지도"
+END
+
+GUI:ArmyPlanesShort
+"전투기"
+END
+
+GUI:ArmyHelicoptersShort
+"헬기"
+END
+
+GUI:ArmyGround
+"지상군"
+END
+

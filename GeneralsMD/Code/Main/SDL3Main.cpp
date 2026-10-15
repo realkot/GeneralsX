@@ -727,6 +727,13 @@ int main(int argc, char* argv[])
 			// way AndroidCrashHandler.cpp derives its path: Android's shared
 			// storage mount is always /storage/emulated/<userId>, and
 			// per-user UIDs are always userId*100000 + appId.
+			// GeneralsX @build Codex 14/10/2026 An isolated APK must also isolate saves/maps/options.
+#if defined(GX_ANDROID_INPUT_TEST)
+			if (externalPath != nullptr) {
+				std::string testUserData = std::string(externalPath) + "/UserData";
+				setenv("GENERALSX_USERDATA_DIR", testUserData.c_str(), 1);
+			}
+#else
 			int userId = (int)(getuid() / 100000);
 			char generalsRoot[280];
 			int rootLen = snprintf(generalsRoot, sizeof(generalsRoot),
@@ -752,6 +759,15 @@ int main(int argc, char* argv[])
 					mkdir(baseUserDataDir, 0755);
 				}
 			}
+#endif
+		}
+		// GeneralsX @bugfix Android port 05/10/2026 Issue #36: where the launcher always unpacks the
+		// bundled fonts, for when they could not be copied into the game folder
+		// (render2dsentence.cpp, Locate_Font_FontConfig).
+		if (externalPath != nullptr) {
+			char fontsDir[1024];
+			snprintf(fontsDir, sizeof(fontsDir), "%s/fonts", externalPath);
+			setenv("GENERALSX_BUNDLED_FONTS_DIR", fontsDir, 1);
 		}
 		if (cachePath != nullptr) {
 			// DXVK shader cache: regenerable, belongs in the OS-purgeable dir.
@@ -1345,15 +1361,22 @@ int main(int argc, char* argv[])
 						FILE *fp = fopen(optionsPath, "r");
 						if (fp) {
 							char line[256];
+							bool savedResolution = false;
 							while (fgets(line, sizeof(line), fp)) {
 								int savedX = 0, savedY = 0;
-								if (sscanf(line, " Resolution = %d %d", &savedX, &savedY) == 2 &&
+								if (!savedResolution && sscanf(line, " Resolution = %d %d", &savedX, &savedY) == 2 &&
 								    savedX > 0 && savedY > 0) {
 									xres = savedX & ~1;
 									yres = savedY;
+									savedResolution = true;
 									fprintf(stderr, "INFO: using saved Resolution %dx%d from Options.ini instead of window size %dx%d\n",
 									        xres, yres, winW, winH);
-									break;
+								}
+								int uiScale = 0;
+								if (sscanf(line, " GXUiScale = %d", &uiScale) == 1 && uiScale > 0) {
+									char uiScaleVal[16];
+									snprintf(uiScaleVal, sizeof(uiScaleVal), "%d", uiScale);
+									setenv("GX_UI_SCALE", uiScaleVal, 1);
 								}
 							}
 							fclose(fp);

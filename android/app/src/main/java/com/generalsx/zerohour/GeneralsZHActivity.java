@@ -36,6 +36,7 @@ import android.content.res.AssetManager;
 import android.graphics.Rect;
 import android.os.Build;
 import android.view.Display;
+import android.view.KeyEvent;
 import android.view.DisplayCutout;
 import android.view.RoundedCorner;
 import android.view.WindowInsets;
@@ -67,6 +68,74 @@ public class GeneralsZHActivity extends SDLActivity {
     static final String EXTRA_AUTO_QUIT = "gx_auto_quit";
     static final String EXTRA_CRC_EVERY_FRAME = "gx_crc_every_frame";
 
+    // GeneralsX @feature Android port 02/10/2026 The game's text fields are edited in an
+    // EditText bar (cursor, selection, copy, paste) -- see TextEditorBar and the engine's
+    // AndroidTextEditor.cpp. The engine calls show/hide from its own thread; the bar reports
+    // back through the two native methods, which only queue for the engine's next frame.
+    private TextEditorBar textEditorBar;
+    private final java.util.HashSet<Integer> textEditorKeyUps = new java.util.HashSet<>();
+
+    private static native void nativeTextEditorChanged(String text, int serial);
+    private static native void nativeTextEditorDone(String text, boolean submit, int serial);
+
+    @SuppressWarnings("unused") // called via JNI
+    public void showTextEditor(final String text, final int maxLength, final int flags, final int serial) {
+        runOnUiThread(() -> {
+            if (mLayout == null) {
+                return;
+            }
+            if (textEditorBar == null) {
+                textEditorBar = new TextEditorBar(this, mLayout, new TextEditorBar.Listener() {
+                    @Override public void onChanged(String changed, int changedSerial) {
+                        nativeTextEditorChanged(changed, changedSerial);
+                    }
+                    @Override public void onDone(String finished, boolean submit, int doneSerial) {
+                        nativeTextEditorDone(finished, submit, doneSerial);
+                    }
+                }, () -> {
+                    if (mSurface != null) {
+                        mSurface.requestFocus();
+                    }
+                });
+            }
+            textEditorBar.show(text, maxLength, flags, serial);
+        });
+    }
+
+    @SuppressWarnings("unused") // called via JNI
+    public void hideTextEditor() {
+        runOnUiThread(() -> {
+            if (textEditorBar != null) {
+                textEditorBar.hide();
+            }
+        });
+    }
+
+    // Back closes the bar (keeping the text) instead of reaching the game. While the keyboard
+    // is up, the keyboard takes the first Back itself.
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_UP && textEditorKeyUps.remove(event.getKeyCode())) {
+            if (textEditorBar != null && textEditorBar.isShown()) {
+                if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) textEditorBar.finish(false);
+                else textEditorBar.dispatchKeyEvent(event);
+            }
+            return true;
+        }
+        if (event.getAction() == KeyEvent.ACTION_DOWN && textEditorBar != null && textEditorBar.isShown())
+            textEditorKeyUps.add(event.getKeyCode());
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && textEditorBar != null && textEditorBar.isShown()) {
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                textEditorBar.finish(false);
+            }
+            return true;
+        }
+        if (textEditorBar != null && textEditorBar.isShown() && textEditorBar.dispatchKeyEvent(event)) {
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
     // singleInstance: a relaunch from the Replay check screen can arrive here instead of
     // creating a new activity; keep the newest launch's extras for getArguments().
     @Override
@@ -83,6 +152,20 @@ public class GeneralsZHActivity extends SDLActivity {
             args.add("-gxSafeInsets");
             args.add(safeInsets);
         }
+
+        // GeneralsX @feature Android port 04/10/2026 Mod Manager Phase 1.
+        // The retail command-line parser already owns mod semantics; the launcher
+        // only supplies the validated absolute child selected under GameData/Mods.
+        // Keeping this in getArguments() means both 30 Hz and 60 Hz engines receive
+        // the exact same mod without any gameplay-side Android special case.
+        if (SetupActivity.isSkipIntroEnabled(this)) args.add("-nologo");
+        String activeMod = ModManager.getActiveModPath(this);
+        if (activeMod != null) {
+            args.add("-mod");
+            args.add(activeMod);
+            Log.i(TAG, "Launching with mod: " + activeMod);
+        }
+
         Intent intent = getIntent();
         String replay = intent != null ? intent.getStringExtra(EXTRA_REPLAY) : null;
         if (replay == null || replay.isEmpty()) {
@@ -110,7 +193,7 @@ public class GeneralsZHActivity extends SDLActivity {
     // Measure the safe insets of this window -- the cutout's safe insets, and on Android 12+
     // the part of each rounded corner a line of text at the edge would run into -- and pass
     // them as fractions of the window, "left,top,right,bottom", for Common/GXSafeArea.h.
-    // Returns null when nothing is known (Android 9, or no cutout and square corners).
+    // Returns null when nothing is known (Android 9).
     private String computeSafeInsetsArgument() {
         try {
             int width;
@@ -137,6 +220,7 @@ public class GeneralsZHActivity extends SDLActivity {
             } else {
                 return null;
             }
+            boolean cornersKnown = false;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 // A text line hugging an edge meets the corner arc about 0.3 of the radius in
                 // (1 - cos 45 degrees); apply that to both sides of every corner.
@@ -150,12 +234,25 @@ public class GeneralsZHActivity extends SDLActivity {
                 for (int[] c : corners) {
                     RoundedCorner corner = display != null ? display.getRoundedCorner(c[0]) : null;
                     if (corner == null) continue;
+                    cornersKnown = true;
                     int inset = (int) Math.ceil(corner.getRadius() * 0.3);
                     if (c[1] == 1) left = Math.max(left, inset);
                     if (c[2] == 1) top = Math.max(top, inset);
                     if (c[3] == 1) right = Math.max(right, inset);
                     if (c[4] == 1) bottom = Math.max(bottom, inset);
                 }
+            }
+            // GeneralsX @bugfix Android port 28/09/2026 Before Android 12 the system cannot tell
+            // the corner radius, and some Android 12+ firmwares report none: on such a phone the
+            // FPS/clock line sat at the very top edge and was cut off (the old test phone, a
+            // teardrop notch that gave a left inset only). Assume a typical phone corner, a radius
+            // of 8% of the short side, and keep the same 0.3 of it clear on every side.
+            if (!cornersKnown && width > 0 && height > 0) {
+                int inset = (int) Math.ceil(Math.min(width, height) * 0.08 * 0.3);
+                left = Math.max(left, inset);
+                top = Math.max(top, inset);
+                right = Math.max(right, inset);
+                bottom = Math.max(bottom, inset);
             }
             if (width <= 0 || height <= 0 || (left | top | right | bottom) == 0) {
                 return null;
@@ -297,10 +394,12 @@ public class GeneralsZHActivity extends SDLActivity {
         // already had a custom path saved before this fix shipped would
         // otherwise keep missing fonts/ forever (every button renders with no
         // text; see SetupActivity.copyBundledRuntimeIfMissing for why).
-        if (haveCustomPath) {
+        // GeneralsX @bugfix Codex 14/10/2026 Legacy GameData installs need fresh WND overrides on APK updates too.
+        if (haveCustomPath || haveLegacyPath) {
             File bundledRoot = getExternalFilesDir(null);
             if (bundledRoot != null) {
-                SetupActivity.copyBundledRuntimeIfMissing(bundledRoot, gamePath);
+                SetupActivity.copyBundledRuntimeIfMissing(bundledRoot,
+                    haveCustomPath ? gamePath : legacyGameDataDir().getAbsolutePath());
             }
         }
 
@@ -404,13 +503,22 @@ public class GeneralsZHActivity extends SDLActivity {
      * file to get a fresh copy on next launch. The one exception is
      * gamedata/Window/ -- see copyAssetTree's comment on ALWAYS_OVERWRITE_PREFIX.
      */
+    private boolean refreshHdAssets;
+    private boolean hdExtractionFailed;
+
     private void extractBundledRuntime() {
         File root = getExternalFilesDir(null);
         if (root == null) {
             Log.e(TAG, "external files dir unavailable; asset extraction skipped");
             return;
         }
+        // GeneralsX @performance Codex 15/10/2026 A full UI pack is large: extract
+        // owned art once per APK version, retrying incomplete deliveries on next launch.
+        refreshHdAssets = getPreferences(MODE_PRIVATE).getInt("hd_assets_version", -1) != BuildConfig.VERSION_CODE;
+        hdExtractionFailed = false;
         copyAssetTree("gamedata", root);
+        if (!hdExtractionFailed) getPreferences(MODE_PRIVATE).edit()
+                .putInt("hd_assets_version", BuildConfig.VERSION_CODE).apply();
     }
 
     // GeneralsX @bugfix Android port 02/08/2026 gamedata/Window/ holds loose
@@ -433,11 +541,14 @@ public class GeneralsZHActivity extends SDLActivity {
                 if (rel.startsWith("/")) rel = rel.substring(1);
                 if (rel.isEmpty()) return;
                 File dest = new File(destRoot, rel);
-                boolean alwaysOverwrite = rel.startsWith(ALWAYS_OVERWRITE_PREFIX);
+                // GeneralsX @feature Codex 15/10/2026 Refresh only our named HD HUD assets.
+                boolean alwaysOverwrite = rel.startsWith(ALWAYS_OVERWRITE_PREFIX)
+                        || (rel.startsWith("Art/Textures/gx_hd_") && refreshHdAssets);
                 if (dest.exists() && !alwaysOverwrite) return;
                 File parent = dest.getParentFile();
                 if (parent != null && !parent.exists() && !parent.mkdirs()) {
                     Log.e(TAG, "mkdirs failed for " + parent);
+                    hdExtractionFailed = true;
                     return;
                 }
                 try (InputStream in = assets.open(assetPath);
@@ -455,6 +566,7 @@ public class GeneralsZHActivity extends SDLActivity {
                 }
             }
         } catch (IOException e) {
+            hdExtractionFailed = true;
             Log.e(TAG, "asset extraction failed for " + assetPath, e);
         }
     }

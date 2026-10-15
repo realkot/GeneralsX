@@ -25816,3 +25816,44 @@ GUI:BeaconClear
 "Löschen"
 END
 
+
+// Android army selection buttons
+GUI:ArmyScreen
+"Armee: Sicht"
+END
+
+GUI:ArmyMap
+"Armee: Karte"
+END
+
+// GeneralsX @feature Codex 14/10/2026 Combat aviation selection
+GUI:ArmyPlanes
+"Flugzeuge"
+END
+
+GUI:ArmyHelicopters
+"Helikopter"
+END
+
+
+// GeneralsX @selection Codex 14/10/2026 Compact vertical army labels.
+GUI:ArmyScreenShort
+"Bild"
+END
+
+GUI:ArmyMapShort
+"Karte"
+END
+
+GUI:ArmyPlanesShort
+"Flieger"
+END
+
+GUI:ArmyHelicoptersShort
+"Helis"
+END
+
+GUI:ArmyGround
+"Boden"
+END
+

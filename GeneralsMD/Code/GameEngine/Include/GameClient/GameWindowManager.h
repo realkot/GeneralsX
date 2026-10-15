@@ -280,6 +280,8 @@ public:
 	virtual GameWindow *winGetCapture();  ///< current mouse capture settings
 
 	virtual Int winSetModal( GameWindow *window );  ///< put at top of modal stack
+	// GeneralsX @input Codex 14/10/2026 Keep touchpad gestures outside modal dialogs.
+	Bool winHasModal() const { return m_modalHead != NULL; }
 	virtual Int winUnsetModal( GameWindow *window );  /**< take window off modal stack, if window is
 																										not at top of stack and error will occur */
 

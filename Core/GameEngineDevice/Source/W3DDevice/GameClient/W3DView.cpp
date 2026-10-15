@@ -632,10 +632,21 @@ Bool W3DView::isWithinCameraAreaConstraints() const
 }
 
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @feature Codex 14/10/2026 Twice the user zoom-out range; default and script framing stay retail.
+static Real gxUserCameraHeightLimit(Real nominal, Bool userControlled)
+{
+#if defined(__ANDROID__)
+    // GeneralsX @tweak Codex 15/10/2026 Absolute manual ceiling, including map multipliers.
+    return userControlled ? (nominal > 900.0f ? 3600.0f : nominal * 4.0f) : nominal;
+#else
+    return nominal;
+#endif
+}
+
 Bool W3DView::isWithinCameraHeightConstraints() const
 {
 	const Bool isAboveMinHeight = m_currentHeightAboveGround >= m_minHeightAboveGround;
-	const Bool isBelowMaxHeight = m_currentHeightAboveGround <= m_maxHeightAboveGround;
+	const Bool isBelowMaxHeight = m_currentHeightAboveGround <= gxUserCameraHeightLimit(m_maxHeightAboveGround, m_isUserControlled);
 	return isAboveMinHeight && (isBelowMaxHeight || !TheGlobalData->m_enforceMaxCameraHeight);
 }
 
@@ -709,11 +720,11 @@ Real W3DView::getMaxHeight(Real x, Real y) const
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA
 	if (!m_isUserControlled)
 	{
-		return getHeightAroundPos(x, y) + m_maxHeightAboveGround;
+		return getHeightAroundPos(x, y) + gxUserCameraHeightLimit(m_maxHeightAboveGround, m_isUserControlled);
 	}
 #endif
 
-	return m_pos.z + m_maxHeightAboveGround;
+	return m_pos.z + gxUserCameraHeightLimit(m_maxHeightAboveGround, m_isUserControlled);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2311,7 +2322,7 @@ void W3DView::setZoomToMax()
 {
 	// default zoom has to be max, otherwise players will just zoom to max always
 	m_heightAboveGround = m_maxHeightAboveGround;
-	m_zoom = getMaxZoom(m_pos.x, m_pos.y);
+	m_zoom = getDesiredZoom(m_pos.x, m_pos.y);
 
 	m_cameraAreaConstraintsValid = false; // recalc it.
 	m_recalcCamera = true;

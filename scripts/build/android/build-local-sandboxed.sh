@@ -25,13 +25,20 @@ SDL3_IMAGE_TAG="release-3.4.0"
 OPENAL_SOFT_TAG="1.24.2"
 
 echo "=== [1/8] apt: ccache ==="
-sudo apt-get update -qq
-sudo apt-get install -y -qq --no-install-recommends ccache
+# GeneralsX @build Codex 14/10/2026 Do not refresh apt on every dual-Hz pass.
+if ! command -v ccache >/dev/null 2>&1; then
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq --no-install-recommends ccache
+fi
 ccache --version | head -1
 
 echo "=== [2/8] Android SDK (cmdline-tools + NDK + platform-35 + build-tools) ==="
 # dl.google.com is not blocked -- this step needs no workaround.
 if [ ! -f "/opt/android-sdk/ndk/${NDK_VERSION}/build/cmake/android.toolchain.cmake" ]; then
+  if [ "${GX_PRESERVE_BUILD_ENV:-0}" = "1" ]; then
+    echo "ERROR: preserved SDK is incomplete; stop for explicit toolchain setup, never delete it."
+    exit 1
+  fi
   curl -fL --retry 3 -o /tmp/cmdline-tools.zip \
     "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip"
   echo "${CMDLINE_TOOLS_SHA1}  /tmp/cmdline-tools.zip" | sha1sum -c -
@@ -55,7 +62,7 @@ test -f "${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake" || { echo "NDK
 
 echo "=== [3/8] ccache config ==="
 export CCACHE_DIR="$HOME/.cache/ccache"
-ccache --set-config=max_size=3G
+ccache --set-config=max_size="${GX_CCACHE_MAX_SIZE:-0}"
 ccache --set-config=compiler_check=content
 ccache --zero-stats
 
@@ -67,6 +74,10 @@ if [ ! -d /opt/vcpkg/.git ]; then
 fi
 CURRENT="$(git -C /opt/vcpkg rev-parse HEAD || echo none)"
 if [ "$CURRENT" != "${VCPKG_COMMIT}" ]; then
+  if [ "${GX_PRESERVE_BUILD_ENV:-0}" = "1" ]; then
+    echo "ERROR: preserved vcpkg revision differs; stop without resetting the toolchain."
+    exit 1
+  fi
   git -C /opt/vcpkg fetch origin "${VCPKG_COMMIT}"
   git -C /opt/vcpkg checkout "${VCPKG_COMMIT}"
   rm -f /opt/vcpkg/vcpkg
@@ -120,8 +131,17 @@ cmake --preset "${PRESET}" \
 # `ln -sfn` onto an existing directory nests the link inside it instead of
 # replacing it, so remove the placeholder first.
 mkdir -p "build/${PRESET}/_deps"
-rm -rf "build/${PRESET}/_deps/sdl3-src"
-ln -sfn "${FETCHCONTENT_SRC}/SDL3-src" "build/${PRESET}/_deps/sdl3-src"
+SDL_LINK="build/${PRESET}/_deps/sdl3-src"
+if [ -L "$SDL_LINK" ] && [ "$(readlink "$SDL_LINK")" = "${FETCHCONTENT_SRC}/SDL3-src" ]; then
+  echo "Reusing SDL3 source link"
+else
+  if [ -e "$SDL_LINK" ] || [ -L "$SDL_LINK" ]; then
+    SDL_LINK_BACKUP="build/packaging-history/sdl-source-$(date +%s%N)"
+    mkdir -p "$(dirname "$SDL_LINK_BACKUP")"
+    mv "$SDL_LINK" "$SDL_LINK_BACKUP"
+  fi
+  ln -s "${FETCHCONTENT_SRC}/SDL3-src" "$SDL_LINK"
+fi
 
 echo "=== [7/8] Build z_generals + DXVK d3d8/d3d9 + hooks ==="
 cmake --build "build/${PRESET}" --target z_generals dxvk_d3d8_install \
@@ -199,15 +219,17 @@ fi
 # Turnip driver at ${GX_ANDROID_STAGING}/default_driver/{meta.json,*.so} --
 # both are fetched from github.com release assets, which this script can't
 # reach itself.
-# Always package from a clean Gradle build dir. AGP's incremental packager
-# can leave superseded entries physically in the zip when a library shrinks,
-# rewriting only the central directory -- the .apk then carries dead weight
-# that no amount of stripping removes. This has bitten twice now: once when
-# libmain.so went 282MB -> 41MB post-strip and the .apk didn't shrink one
-# byte, and again at 58MB where 18MB turned out to be orphaned. Re-running
-# packaging costs ~10s against a native build measured in minutes, so pay it
-# unconditionally rather than shipping a mystery-sized APK.
-rm -rf android/app/build
+# GeneralsX @build Codex 14/10/2026 Keep Gradle classes, toolchain and caches. Archive only
+# the incremental APK writer state/output, so ZFile starts fresh without deleting the build tree.
+PACKAGING_HISTORY="build/packaging-history/gradle-$(date +%s%N)"
+for state in android/app/build/intermediates/incremental/packageDebug \
+             android/app/build/intermediates/apk/debug \
+             android/app/build/outputs/apk/debug; do
+  if [ -e "$state" ]; then
+    mkdir -p "$PACKAGING_HISTORY/$(dirname "$state")"
+    mv "$state" "$PACKAGING_HISTORY/$state"
+  fi
+done
 
 ./scripts/build/android/package-android-zh.sh
 

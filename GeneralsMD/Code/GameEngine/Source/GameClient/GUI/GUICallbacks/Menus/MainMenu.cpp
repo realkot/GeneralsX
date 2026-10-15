@@ -495,7 +495,8 @@ static void initLabelVersion()
 	GameWindow *labelVersion = TheWindowManager->winGetWindowFromId( nullptr, versionID );
 	UnicodeString creditText;
 #if defined(__ANDROID__)
-	creditText.translate("GeneralsX for Android - C&C Generals Zero Hour");
+	// GeneralsX @tweak Codex 15/10/2026 Owner's menu branding; preserve upstream source credits.
+	creditText.translate("GeneralsX [mod by realkot] github.com/realkot/GeneralsX");
 #else
 	creditText.translate("GeneralsX - Multiplatform C&C Generals");
 #endif

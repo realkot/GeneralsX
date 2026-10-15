@@ -1,3 +1,4 @@
+#include "GXAndroidIdentity.h"
 /*
 **	Command & Conquer Generals Zero Hour(tm)
 **	Copyright 2025 Electronic Arts Inc.
@@ -44,7 +45,7 @@ namespace GXRemoteConfig
 #if defined(__ANDROID__)
 		char path[256];
 		const int userId = (int)(getuid() / 100000);
-		snprintf(path, sizeof(path), "/data/user/%d/com.generalsx.zerohour/files/update", userId);
+		snprintf(path, sizeof(path), "/data/user/%d/" GX_ANDROID_APP_ID "/files/update", userId);
 		return path;
 #else
 		return std::string();

@@ -46,6 +46,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include <cstdlib>
 #include <cctype>
+#include <string>
 
 #include "GameClient/GameText.h"
 #include "Common/Language.h"
@@ -57,6 +58,10 @@
 #include "Common/GlobalData.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
+#include "Common/ArchiveFileSystem.h"
+#include "Common/ArchiveFile.h"
+#include "Common/LocalFileSystem.h"
+#include "Common/ModLocalization.h"
 #include "Common/version.h"
 
 
@@ -195,10 +200,10 @@ class GameTextManager : public GameTextInterface
 		void						readToEndOfQuote( File *file, Char *in, Char *out, Char *wavefile, Int maxBufLen );
 		void						reverseWord ( Char *file, Char *lp );
 		void						translateCopy( WideChar *outbuf, Char *inbuf );
-		Bool						getStringCount( const Char *filename, Int& textCount );
+		Bool						getStringCount( const Char *filename, Int& textCount, FileInstance instance = 0 );
 		Bool						getCSFInfo ( const Char *filename, Int& textCount, LanguageID& language, FileInstance instance = 0 );
 		Bool						parseCSF(  const Char *filename, StringInfo *stringInfo, Int textCount, Int& maxLabelLen, FileInstance instance = 0 );
-		Bool						parseStringFile( const char *filename );
+		Bool						parseStringFile( const char *filename, FileInstance instance = 0, StringInfo* destination = nullptr );
 		Bool						parseMapStringFile( const char *filename );
 		Bool						readLine( char *buffer, Int max, File *file );
 		Char						readChar( File *file );
@@ -253,6 +258,9 @@ static const GXEnglishDefault s_gxEnglishDefaults[] =
 	{ "GX:ToolTipBuilderPageMore", L"Show this builder's orders, such as waypoints" },
 	{ "GX:BuilderPageBack",        L"Structures" },
 	{ "GX:ToolTipBuilderPageBack", L"Back to the list of structures" },
+	// GeneralsOnline buttons the original menus do not have (score screen, player info).
+	{ "GX:ViewMatchOnline",    L"VIEW MATCH ONLINE" },
+	{ "GX:Logout",             L"LOGOUT" },
 };
 
 
@@ -338,8 +346,19 @@ GameTextManager::~GameTextManager()
 extern const Char *g_strFile;
 extern const Char *g_csfFile;
 
+static void gxLogTextSource(const AsciiString& filename, FileInstance instance, Int format, Bool modText)
+{
+	const Bool loose = TheLocalFileSystem && TheLocalFileSystem->doesFileExist(filename.str());
+	ArchiveFile* archive = TheArchiveFileSystem && (!loose || instance > 0)
+		? TheArchiveFileSystem->getArchiveFile(filename, instance - (loose ? 1 : 0)) : nullptr;
+	fprintf(stderr, "[GX-TEXT] format=%s path='%s' instance=%u source='%s' activeModText=%s\n",
+		format == CSF_FILE ? "CSF" : "STR", filename.str(), (unsigned)instance,
+		archive ? archive->getName().str() : "loose", modText ? "yes" : "no");
+}
+
 void GameTextManager::init()
 {
+	if (m_initialized) return;
 	// GeneralsX @feature Android port 09/09/2026 The language of the TEXT, which is not
 	// necessarily the language of the game.
 	//
@@ -376,6 +395,24 @@ void GameTextManager::init()
 	else
 		strFile = g_strFile;
 
+	// GeneralsX @bugfix Codex 08/10/2026 Resolve all mod instances and layouts.
+	// Compare language/layout priority across formats: requested CSF beats English STR.
+	const AsciiString vanillaCSF = csfFile;
+	const AsciiString vanillaSTR = strFile;
+	const ModLocalizationSource strSource = resolveModLocalization(strFile, textLanguage, "generals.str");
+	const ModLocalizationSource csfSource = resolveModLocalization(csfFile, textLanguage, "generals.csf");
+	strFile = strSource.filename;
+	csfFile = csfSource.filename;
+	const FileInstance strInstance = strSource.instance;
+	const FileInstance csfInstance = csfSource.instance;
+	const Bool preferModCsf = csfSource.activeMod && !(m_useStringFile && strSource.activeMod
+		&& strSource.priority <= csfSource.priority);
+	fprintf(stderr, "[GX-MOD-LANG] activeMod=%s\n", !TheGlobalData ? "Vanilla" :
+		(TheGlobalData->m_modDir.isNotEmpty() ? TheGlobalData->m_modDir.str() :
+		(TheGlobalData->m_modBIG.isNotEmpty() ? TheGlobalData->m_modBIG.str() : "Vanilla")));
+	fprintf(stderr, "[GX-MOD-LANG] language=%s\n", textLanguage.str());
+	fprintf(stderr, "[GX-MOD-LANG] strSource=%s\n", strSource.description.str());
+	fprintf(stderr, "[GX-MOD-LANG] csfSource=%s\n", csfSource.description.str());
 	Int format;
 
 	// GeneralsX @bugfix BenderAI 16/02/2026 - Debug CSF init
@@ -397,11 +434,15 @@ void GameTextManager::init()
 	}
 #endif
 
-	if ( m_useStringFile && getStringCount( strFile.str(), m_textCount ) )
+	if ( preferModCsf && getCSFInfo( csfFile.str(), m_textCount, m_language, csfInstance ) && m_textCount > 0 )
+	{
+		format = CSF_FILE;
+	}
+	else if ( m_useStringFile && getStringCount( strFile.str(), m_textCount, strInstance ) && m_textCount > 0 )
 	{
 		format = STRING_FILE;
 	}
-	else if ( getCSFInfo ( csfFile.str(), m_textCount, m_language ) )
+	else if ( getCSFInfo ( csfFile.str(), m_textCount, m_language, csfInstance ) )
 	{
 		fprintf(stderr, "[CSF] init() - getCSFInfo OK, textCount=%d\n", m_textCount);
 		format = CSF_FILE;
@@ -429,7 +470,7 @@ void GameTextManager::init()
 
 	if ( format == STRING_FILE )
 	{
-		if( parseStringFile( strFile.str() ) == FALSE )
+		if( parseStringFile( strFile.str(), strInstance ) == FALSE )
 		{
 			deinit();
 			return;
@@ -438,7 +479,7 @@ void GameTextManager::init()
 	else
 	{
 		fprintf(stderr, "[CSF] init() - Calling parseCSF()...\n");
-		if ( !parseCSF ( csfFile.str(), m_stringInfo, m_textCount, m_maxLabelLen ) )
+		if ( !parseCSF ( csfFile.str(), m_stringInfo, m_textCount, m_maxLabelLen, csfInstance ) )
 		{
 			fprintf(stderr, "[CSF] init() - parseCSF FAILED\n");
 			deinit();
@@ -461,21 +502,57 @@ void GameTextManager::init()
 	}
 
 	qsort( m_stringLUT, m_textCount, sizeof(StringLookUp), compareLUT  );
+	const Bool modText = format == CSF_FILE ? csfSource.activeMod : strSource.activeMod;
+	gxLogTextSource(format == CSF_FILE ? csfFile : strFile,
+		format == CSF_FILE ? csfInstance : strInstance, format, modText);
+	fprintf(stderr, "[GX-MOD-LANG] instance=%u\n", (unsigned)(format == CSF_FILE ? csfInstance : strInstance));
+	fprintf(stderr, "[GX-MOD-LANG] selectedSource=%s\n", modText ? "ACTIVE_MOD" : "VANILLA");
+	fprintf(stderr, "[GX-MOD-LANG] selectedFormat=%s\n", format == CSF_FILE ? "CSF" : "STR");
 
 	// GeneralsX @bugfix BenderAI 22/05/2026 Load fallback CSF instance when a mod provides an incomplete table.
-	if ( format == CSF_FILE )
+	if ( format == CSF_FILE || modText )
 	{
 		Int fallbackCount = 0;
+		if (format == STRING_FILE) m_language = LANGUAGE_ID_US;
 		LanguageID originalLanguage = m_language;
+		AsciiString fallbackFile = csfFile;
+		FileInstance fallbackInstance = (FileInstance)(csfInstance + 1);
+		Bool readable = FALSE;
+		Bool fallbackSTR = FALSE;
+		// GeneralsX @bugfix Codex 08/10/2026 Missing mod labels use a genuinely
+		// non-mod table, never another BIG owned by the same active directory.
+		if (modText)
+		{
+			ModLocalizationSource fallback = resolveVanillaLocalization(vanillaCSF);
+			readable = fallback.available && getCSFInfo(fallback.filename.str(), fallbackCount, m_language, fallback.instance) && fallbackCount > 0;
+			if (!readable && textLanguage.compareNoCase("english") != 0)
+			{
+				AsciiString englishCSF;
+				englishCSF.format(g_csfFile, "english");
+				fallback = resolveVanillaLocalization(englishCSF);
+				readable = fallback.available && getCSFInfo(fallback.filename.str(), fallbackCount, m_language, fallback.instance) && fallbackCount > 0;
+			}
+			if (!readable && m_useStringFile)
+			{
+				fallback = resolveVanillaLocalization(vanillaSTR);
+				readable = fallback.available && getStringCount(fallback.filename.str(), fallbackCount, fallback.instance) && fallbackCount > 0;
+				fallbackSTR = readable;
+			}
+			fallbackFile = fallback.filename;
+			fallbackInstance = fallback.instance;
+		}
+		else if (csfInstance < (std::numeric_limits<FileInstance>::max)())
+			readable = getCSFInfo(fallbackFile.str(), fallbackCount, m_language, fallbackInstance) && fallbackCount > 0;
 
-		if ( getCSFInfo(csfFile.str(), fallbackCount, m_language, 1) && fallbackCount > 0 )
+		if ( readable )
 		{
 			m_fallbackStringInfo = NEW StringInfo[fallbackCount];
 
 			if ( m_fallbackStringInfo != nullptr )
 			{
 				Int fallbackMaxLabelLen = m_maxLabelLen;
-				if ( parseCSF(csfFile.str(), m_fallbackStringInfo, fallbackCount, fallbackMaxLabelLen, 1) )
+				if ( fallbackSTR ? parseStringFile(fallbackFile.str(), fallbackInstance, m_fallbackStringInfo)
+					: parseCSF(fallbackFile.str(), m_fallbackStringInfo, fallbackCount, fallbackMaxLabelLen, fallbackInstance) )
 				{
 					m_fallbackTextCount = fallbackCount;
 					m_maxLabelLen = max(m_maxLabelLen, fallbackMaxLabelLen);
@@ -1032,14 +1109,14 @@ void GameTextManager::translateCopy( WideChar *outbuf, Char *inbuf )
 // GameTextManager::getStringCount
 //============================================================================
 
-Bool GameTextManager::getStringCount( const char *filename, Int& textCount )
+Bool GameTextManager::getStringCount( const char *filename, Int& textCount, FileInstance instance )
 {
 	Int ok = TRUE;
 
 	textCount = 0;
 
 	File *file;
-	file = TheFileSystem->openFile(filename, File::READ | File::TEXT);
+	file = TheFileSystem->openFile(filename, File::READ | File::TEXT, File::BUFFERSIZE, instance);
 	DEBUG_LOG(("Looking in %s for string file", filename));
 
 	if ( file == nullptr )
@@ -1291,12 +1368,14 @@ quit:
 // GameTextManager::parseStringFile
 //============================================================================
 
-Bool GameTextManager::parseStringFile( const char *filename )
+Bool GameTextManager::parseStringFile( const char *filename, FileInstance instance, StringInfo* destination )
 {
+	// GeneralsX @bugfix Codex 08/10/2026 Reuse the STR parser for missing-label fallback.
+	StringInfo* strings = destination ? destination : m_stringInfo;
 	Int listCount = 0;
 	Int ok = TRUE;
 
-	File *file = TheFileSystem->openFile(filename, File::READ | File::TEXT);
+	File *file = TheFileSystem->openFile(filename, File::READ | File::TEXT, File::BUFFERSIZE, instance);
 
 	if ( file == nullptr )
 	{
@@ -1320,13 +1399,13 @@ Bool GameTextManager::parseStringFile( const char *filename )
 
 		for ( Int i = 0; i < listCount; i++ )
 		{
-			if ( stricmp ( m_stringInfo[i].label.str(), m_buffer ) == 0)
+			if ( stricmp ( strings[i].label.str(), m_buffer ) == 0)
 			{
 				DEBUG_CRASH ( ("String label '%s' multiply defined!", m_buffer ));
 			}
 		}
 
-		m_stringInfo[listCount].label = m_buffer;
+		strings[listCount].label = m_buffer;
 		len = strlen ( m_buffer );
 
 
@@ -1358,7 +1437,7 @@ Bool GameTextManager::parseStringFile( const char *filename )
 				if ( readString )
 				{
 					// only one string per label allows
-						DEBUG_CRASH ( ("String label '%s' has more than one string defined!", m_stringInfo[listCount].label.str()));
+						DEBUG_CRASH ( ("String label '%s' has more than one string defined!", strings[listCount].label.str()));
 				}
 				else
 				{
@@ -1366,8 +1445,8 @@ Bool GameTextManager::parseStringFile( const char *filename )
 					translateCopy( m_tbuffer, m_buffer2 );
 					stripSpaces ( m_tbuffer );
 
-					m_stringInfo[listCount].text = m_tbuffer ;
-					m_stringInfo[listCount].speech = m_buffer3;
+					strings[listCount].text = m_tbuffer ;
+					strings[listCount].speech = m_buffer3;
 					readString = TRUE;
 				}
 			}

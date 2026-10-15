@@ -30,6 +30,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GXSafeArea.h"
+#include "Common/GXMouseMode.h"
 #include <stdio.h>
 
 #define DEFINE_SHADOW_NAMES
@@ -66,6 +67,7 @@
 #include "GameClient/GameWindowID.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/Image.h"
+#include "GameClient/GXUiScale.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/VideoPlayer.h"
 #include "GameClient/Mouse.h"
@@ -93,6 +95,25 @@
 #include "GameLogic/Module/MobMemberSlavedUpdate.h"//ML
 
 #include "GameNetwork/GameInfo.h"
+
+// GeneralsX @feature Android port 01/10/2026 The corner HUD (frame rate, clock, latency, game time,
+// player list) and the event messages grow with the launcher's interface scale like the rest of the interface
+// (GXUiScale.h), up to twice its size.
+// GeneralsX @bugfix Codex 14/10/2026 Hover is a real aim point even without LMB or a touch.
+// Touch-only input still has no aim until a finger points into the battlefield.
+static const ICoord2D *gxPreviewAimPoint(Mouse *mouse, const ICoord2D& touchAim, Bool touchKnown)
+{
+#if defined(__ANDROID__) || (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
+    if (!mouse || !mouse->hasContinuousPointer()) return touchKnown ? &touchAim : nullptr;
+#endif
+    return mouse ? &mouse->getMouseStatus()->pos : nullptr;
+}
+
+static Int gxHudFontSize( Int size )
+{
+	return (Int)( size * min( GXUiScale::userScale(), 2.0f ) + 0.5f );
+}
+
 #include "GameNetwork/NetworkInterface.h"
 #if defined(GENERALS_ONLINE)
 // ConvertMSLatencyToFrames / ConvertMSLatencyToGenToolFrames, used by drawNetworkLatency.
@@ -145,6 +166,9 @@ static UnicodeString formatIncomeValue(UnsignedInt cashPerMin)
 //-------------------------------------------------------------------------------------------------
 /// The InGameUI singleton instance.
 InGameUI *TheInGameUI = nullptr;
+// GeneralsX @bugfix Codex 15/10/2026 Track UI selection changes without altering the retail object layout.
+static UnsignedInt s_gxSelectionRevision = 0;
+UnsignedInt InGameUI::getSelectionRevision() const { return s_gxSelectionRevision; }
 
 GameWindow *m_replayWindow = nullptr;
 
@@ -1604,15 +1628,10 @@ void InGameUI::handleRadiusCursor()
 			// player is pointing" -- there is no pointer -- it is wherever the last touch
 			// happened to leave it, which is how the ability radius ended up drawn on the
 			// button that armed it, and on the previous attempt's target after re-arming.
-			const ICoord2D *aimPixel = &mouseIO->pos;
+            const ICoord2D *aimPixel = &mouseIO->pos;
 #if defined(__ANDROID__) || (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
-			if( !m_touchAimKnown )
-			{
-				// no finger has pointed anywhere yet: leave the decal exactly as it is
-				// rather than parking it somewhere arbitrary
-				return;
-			}
-			aimPixel = &m_touchAimPoint;
+            aimPixel = gxPreviewAimPoint(TheMouse, m_touchAimPoint, m_touchAimKnown);
+            if (!aimPixel) return;
 #endif
 
 			//
@@ -2040,9 +2059,11 @@ void InGameUI::handleBuildPlacements()
 			// object. Use the aim point the touch layer reports, and draw nothing until a
 			// finger has actually pointed somewhere -- so the ghost appears under the finger,
 			// where the building is going, and nowhere before that.
-			if( !m_touchAimKnown )
-				return;
-			loc = m_touchAimPoint;
+			// GeneralsX @feature Android port 05/10/2026 With a pointer (GXMouseMode.h) the ghost
+			// follows it, as on a PC.
+            const ICoord2D *aim = gxPreviewAimPoint(TheMouse, m_touchAimPoint, m_touchAimKnown);
+            if (!aim) return;
+            loc = *aim;
 #else
 			const MouseIO *mouseIO = TheMouse->getMouseStatus();
 
@@ -2807,8 +2828,10 @@ void InGameUI::addMessageText( const UnicodeString& formattedMessage, const RGBC
 	m_uiMessages[ 0 ].fullText = formattedMessage;
 	m_uiMessages[ 0 ].timestamp = TheGameLogic->getFrame();
 	m_uiMessages[ 0 ].displayString = TheDisplayStringManager->newDisplayString();
+	// GeneralsX @feature Android port 01/10/2026 The event messages at the top left grow with the
+	// launcher's interface scale (GXUiScale.h), up to twice their size.
 	m_uiMessages[ 0 ].displayString->setFont( TheFontLibrary->getFont( m_messageFont,
-																						TheGlobalLanguageData->adjustFontSize(m_messagePointSize), m_messageBold ) );
+																						gxHudFontSize( TheGlobalLanguageData->adjustFontSize(m_messagePointSize) ), m_messageBold ) );
 	m_uiMessages[ 0 ].displayString->setText( m_uiMessages[ 0 ].fullText );
 
 	//
@@ -2923,6 +2946,8 @@ void InGameUI::createGarrisonHint( const GameMessage *msg )
 #include "Common/StateMachine.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/AIPathfind.h"
+
+
 #endif // AI_DEBUG_TOOLTIPS
 
 #endif // defined(RTS_DEBUG)
@@ -3929,6 +3954,7 @@ void InGameUI::selectDrawable( Drawable *draw )
 	{
 
 		m_frameSelectionChanged = TheGameLogic->getFrame();
+		++s_gxSelectionRevision;
 		// set the selection in the drawable
 		draw->friend_setSelected();
 
@@ -3959,6 +3985,7 @@ void InGameUI::deselectDrawable( Drawable *draw )
 	{
 
 		m_frameSelectionChanged = TheGameLogic->getFrame();
+		++s_gxSelectionRevision;
 		// clear the selected bit out of the drawable
 		draw->friend_clearSelected();
 
@@ -3993,6 +4020,7 @@ void InGameUI::deselectDrawable( Drawable *draw )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::deselectAllDrawables( Bool postMsg )
 {
+	++s_gxSelectionRevision;
 	const DrawableList *selected = getAllSelectedDrawables();
 
 	// loop through all the selected drawables
@@ -6648,7 +6676,7 @@ void InGameUI::refreshNetworkLatencyResources()
 	}
 
 	m_networkLatencyPointSize = TheGlobalData->m_networkLatencyFontSize;
-	Int adjustedNetworkLatencyFontSize = TheGlobalLanguageData->adjustFontSize(m_networkLatencyPointSize);
+	Int adjustedNetworkLatencyFontSize = gxHudFontSize(TheGlobalLanguageData->adjustFontSize(m_networkLatencyPointSize));
 	GameFont* latencyFont = TheWindowManager->winFindFont(m_networkLatencyFont, adjustedNetworkLatencyFontSize, m_networkLatencyBold);
 	m_networkLatencyString->setFont(latencyFont);
 }
@@ -6669,7 +6697,7 @@ void InGameUI::refreshRenderFpsResources()
 	}
 
 	m_renderFpsPointSize = TheGlobalData->m_renderFpsFontSize;
-	Int adjustedRenderFpsFontSize = TheGlobalLanguageData->adjustFontSize(m_renderFpsPointSize);
+	Int adjustedRenderFpsFontSize = gxHudFontSize(TheGlobalLanguageData->adjustFontSize(m_renderFpsPointSize));
 	GameFont *fpsFont = TheWindowManager->winFindFont(m_renderFpsFont, adjustedRenderFpsFontSize, m_renderFpsBold);
 	m_renderFpsString->setFont(fpsFont);
 	m_renderFpsLimitString->setFont(fpsFont);
@@ -6688,7 +6716,7 @@ void InGameUI::refreshSystemTimeResources()
 	}
 
 	m_systemTimePointSize = TheGlobalData->m_systemTimeFontSize;
-	Int adjustedSystemTimeFontSize = TheGlobalLanguageData->adjustFontSize(m_systemTimePointSize);
+	Int adjustedSystemTimeFontSize = gxHudFontSize(TheGlobalLanguageData->adjustFontSize(m_systemTimePointSize));
 	GameFont* systemTimeFont = TheWindowManager->winFindFont(m_systemTimeFont, adjustedSystemTimeFontSize, m_systemTimeBold);
 	m_systemTimeString->setFont(systemTimeFont);
 }
@@ -6706,7 +6734,7 @@ void InGameUI::refreshGameTimeResources()
 	}
 
 	m_gameTimePointSize = TheGlobalData->m_gameTimeFontSize;
-	Int adjustedGameTimeFontSize = TheGlobalLanguageData->adjustFontSize(m_gameTimePointSize);
+	Int adjustedGameTimeFontSize = gxHudFontSize(TheGlobalLanguageData->adjustFontSize(m_gameTimePointSize));
 	GameFont* gameTimeFont = TheWindowManager->winFindFont(m_gameTimeFont, adjustedGameTimeFontSize, m_gameTimeBold);
 	m_gameTimeString->setFont(gameTimeFont);
 	m_gameTimeFrameString->setFont(gameTimeFont);
@@ -6715,7 +6743,7 @@ void InGameUI::refreshGameTimeResources()
 void InGameUI::refreshPlayerInfoListResources()
 {
 	m_playerInfoListPointSize = TheGlobalData->m_playerInfoListFontSize;
-	Int adjustedPlayerInfoListPointSize = TheGlobalLanguageData->adjustFontSize(m_playerInfoListPointSize);
+	Int adjustedPlayerInfoListPointSize = gxHudFontSize(TheGlobalLanguageData->adjustFontSize(m_playerInfoListPointSize));
 	m_playerInfoList.init(m_playerInfoListFont, adjustedPlayerInfoListPointSize, m_playerInfoListBold);
 }
 

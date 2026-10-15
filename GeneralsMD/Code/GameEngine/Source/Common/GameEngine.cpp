@@ -26,6 +26,12 @@
 // Implementation of the Game Engine singleton
 // Author: Michael S. Booth, April 2001
 
+// The Android incremental builder compiles this translation unit without its
+// stale PCH. Reproduce the PCH's required first header (CppMacros before PreRTS)
+// so CPP_11 and other compatibility macros are available in normal compilation.
+#if defined(__ANDROID__)
+#include <Utility/CppMacros.h>
+#endif
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 #include "Common/GXRemoteConfig.h"
 #if defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__)
@@ -52,6 +58,7 @@
 #include "Common/ThingFactory.h"
 #include "Common/file.h"
 #include "Common/FileSystem.h"
+#include "Common/ArchiveFile.h"
 #include "Common/ArchiveFileSystem.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/GlobalData.h"
@@ -78,6 +85,8 @@
 #include "Common/Registry.h"
 #include "Common/GameCommon.h"	// FOR THE ALLOW_DEBUG_CHEATS_IN_RELEASE #define
 #include "GXTrace.h"
+#include "GXFrameTimeStats.h"
+#include "GXResourceStats.h"
 
 #include <chrono>
 
@@ -524,6 +533,26 @@ void GameEngine::init()
 
 
 		initSubsystem(TheArchiveFileSystem, "TheArchiveFileSystem", createArchiveFileSystem(), nullptr); // this MUST come after TheLocalFileSystem creation
+#if defined(__ANDROID__) && RTS_ZEROHOUR
+		// On Android the launcher supplies -mod for a standalone BIG directory.
+		// Mount it before the *first* GameData.ini parse, matching the root-BIG
+		// path (which is mounted above in the archive file system's init()).
+		// Parse only -mod here: other engine flags must retain their normal order.
+		CommandLine::parseModForEarlyArchiveInit();
+		const Bool activeModMountedBeforeGameData =
+			TheGlobalData->m_modBIG.isNotEmpty() || TheGlobalData->m_modDir.isNotEmpty();
+		if (activeModMountedBeforeGameData)
+		{
+			fprintf(stderr, "[gxmod-early] mount before GameData: modDir='%s' modBIG='%s'\n",
+				TheGlobalData->m_modDir.str(), TheGlobalData->m_modBIG.str());
+			TheArchiveFileSystem->loadMods();
+			// Archive winner only: loose files can still override the archive source.
+			ArchiveFile* gameDataArchive = TheArchiveFileSystem->getArchiveFile("Data\\INI\\GameData.ini");
+			fprintf(stderr, "[gxmod-early] GameData archive candidate: %s\n",
+				gameDataArchive ? gameDataArchive->getName().str() : "<none>");
+		}
+#endif
+
 
     	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
 	GetPrecisionTimer(&endTime64);//////////////////////////////////////////////////////////////////
@@ -596,7 +625,12 @@ void GameEngine::init()
 		// special-case: parse command-line parameters after loading global data
 		CommandLine::parseCommandLineForEngineInit();
 
-		TheArchiveFileSystem->loadMods();
+#if defined(__ANDROID__) && RTS_ZEROHOUR
+		// A standalone mod was already mounted before GameData.ini; do not
+		// reinsert it. Vanilla and non-Android preserve the original late load.
+		if (!activeModMountedBeforeGameData)
+#endif
+			TheArchiveFileSystem->loadMods();
 
 		// doesn't require resets so just create a single instance here.
 		TheGameLODManager = MSGNEW("GameEngineSubsystem") GameLODManager;
@@ -1141,6 +1175,77 @@ extern NGMPGame* TheNGMPGame;
 #endif
 
 /// -----------------------------------------------------------------------------------------------
+// GeneralsX @feature Android port 02/10/2026 Game speed above normal on a phone that cannot draw that
+// fast. Offline, the original engine runs one logic frame per rendered frame and sets the frame
+// limit from the Game Speed slider, so the game is only as fast as the screen is drawn: at the
+// maximum speed (240 logic frames a second on the 60 Hz engine) an Adreno phone drawing 120 fps
+// played twice as fast as normal, the Mali test phone drawing ~60 not faster at all. Here, when the
+// slider asks for more than normal speed and drawing falls behind it, the logic catches up with
+// extra frames within the same rendered frame -- up to three, within 8 ms, so drawing never stops,
+// and debt beyond that is dropped rather than carried (the game is then slower than asked, never
+// stuck catching up). Offline only (no TheNetwork), never at normal speed or below, where the
+// original "slower frames, slower game" behaviour stays. The logic frames are the same ones in
+// the same order, only grouped differently between draws: replays and saves are unaffected.
+static UnsignedInt s_gxCatchUpSteps = 0;
+
+static void gxCatchUpSpedUpLogic()
+{
+	static std::chrono::steady_clock::time_point s_last;
+	static double s_debt = 0.0;
+	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	double dt = s_last.time_since_epoch().count() != 0 ? std::chrono::duration<double>(now - s_last).count() : 0.0;
+	s_last = now;
+	if (dt > 0.1)
+		dt = 0.1;
+
+#if defined(GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER)
+	const Int normalFps = BaseFps * GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER;
+#else
+	const Int normalFps = BaseFps;
+#endif
+	// GeneralsX @bugfix Android port 03/10/2026 Only a game the player is playing: skirmish or
+	// campaign. A replay plays at its own speed, and catching up inside playback broke the replay
+	// check -- Global_War2.rep, which matched the PC on all 1946 checkpoints on 29/09, mismatched
+	// from the first one on the 02/10 builds (the recorded 60 fps limit is doubled for the 60 Hz
+	// engine, which is above normal, so playback qualified).
+	const Bool playingAGame = (TheGameLogic->isInSkirmishGame() || TheGameLogic->isInSinglePlayerGame())
+		&& !TheGameLogic->isInReplayGame() && (TheRecorder == nullptr || !TheRecorder->isPlaybackMode());
+	const Bool applies = TheNetwork == nullptr && playingAGame && TheGameLogic->isInGame() && !TheGameLogic->isGamePaused()
+		&& TheShell != nullptr && !TheShell->isShellActive()
+		&& !TheFramePacer->isTimeFrozen() && !TheFramePacer->isGameHalted()
+		&& TheFramePacer->isActualFramesPerSecondLimitEnabled()
+		&& TheFramePacer->getActualFramesPerSecondLimit() > normalFps;
+	if (!applies)
+	{
+		s_debt = 0.0;
+		return;
+	}
+
+	// This frame's own logic step already ran (canUpdateRegularGameLogic is true on every frame
+	// while the logic time scale is off, as it is offline).
+	s_debt += dt * TheFramePacer->getActualFramesPerSecondLimit() - 1.0;
+	const std::chrono::steady_clock::time_point until = now + std::chrono::milliseconds(8);
+	Int extra = 0;
+	while (s_debt >= 1.0 && extra < 3 && std::chrono::steady_clock::now() < until)
+	{
+		// The same steps as a regular frame's logic update (canUpdateGameLogic's preUpdate
+		// clears the per-render-frame flag and applies a scheduled pause).
+		TheMessageStream->propagateMessages();
+		TheGameLogic->preUpdate();
+		if (TheGameLogic->isGamePaused())
+			break;
+		TheGameLogic->UPDATE();
+		TheGameClient->step();
+		s_debt -= 1.0;
+		++extra;
+		++s_gxCatchUpSteps;
+	}
+	if (s_debt > 1.0)
+		s_debt = 1.0;
+	else if (s_debt < -1.0)
+		s_debt = -1.0;
+}
+
 DECLARE_PERF_TIMER(GameEngine_update)
 
 /** -----------------------------------------------------------------------------------------------
@@ -1164,14 +1269,120 @@ DECLARE_PERF_TIMER(GameEngine_update)
 // log can show which subsystem actually owns the frame budget instead of
 // guessing. Cost when disabled is the single bool check below -- none of
 // the now()/duration calls execute.
+// GeneralsX @feature Codex 14/10/2026 Extend the existing opt-in phase trace with
+// battle-only frame intervals. Main duration excludes FramePacer; intervals include
+// it. First main-frame duration is CPU latency, not a GPU/display latency claim.
+static void gxTraceBattleWindow(bool battle, unsigned logicFrame, double mainUs)
+{
+	typedef std::chrono::steady_clock Clock;
+	static bool active = false, complete = false;
+	static unsigned lastLogicFrame = 0;
+	static Clock::time_point start, last, windowStart;
+	static GXFrameTimeStats<4096> window;
+	static GXFrameTimeStats<32768> total;
+	if (!battle) {
+		active = false;
+		return;
+	}
+	const Clock::time_point now = Clock::now();
+	if (!active || logicFrame < lastLogicFrame) {
+		active = true;
+		complete = false;
+		start = last = windowStart = now;
+		window.reset();
+		total.reset();
+		fprintf(stderr, "[GX-PERF-BATTLE-BEGIN] logicFrame=%u firstMainFrameMs=%.3f (CPU update; GPU presentation latency unavailable)\n", logicFrame, mainUs / 1000.0);
+	} else if (!complete) {
+		const double intervalMs = std::chrono::duration<double, std::milli>(now - last).count();
+		window.add(intervalMs, mainUs);
+		total.add(intervalMs, mainUs);
+	}
+	last = now;
+	lastLogicFrame = logicFrame;
+	if (complete) return;
+	const double elapsed = std::chrono::duration<double>(now - start).count();
+	const bool finish = elapsed >= 120.0;
+	if (std::chrono::duration<double>(now - windowStart).count() >= 2.0 || finish) {
+		GXFrameTimeStats<4096> &w = window;
+		fprintf(stderr, "[GX-PERF-BATTLE] seconds=%.3f logicFrame=%u samples=%zu dropped=%zu p50=%.3f p95=%.3f p99=%.3f worst=%.3f main=%.3f ms/frame\n",
+			elapsed, logicFrame, w.count, w.dropped, w.percentile(0.50), w.percentile(0.95), w.percentile(0.99), w.worstMs,
+			w.mainUs / (w.count + w.dropped ? w.count + w.dropped : 1) / 1000.0);
+		w.reset();
+		windowStart = now;
+	}
+	if (finish) {
+		fprintf(stderr, "[GX-PERF-BATTLE-END] seconds=%.3f samples=%zu dropped=%zu p50=%.3f p95=%.3f p99=%.3f worst=%.3f ms/frame\n",
+			elapsed, total.count, total.dropped, total.percentile(0.50), total.percentile(0.95), total.percentile(0.99), total.worstMs);
+		complete = true;
+	}
+}
+
+// GeneralsX @feature Codex 14/10/2026 Complete CPU wall path, including explicit
+// FramePacer time. Main includes render-worker waits; worker/GPU work overlaps it.
+static void gxTraceCpuFrame(bool battle, unsigned logicFrame, double mainUs, double pacingUs, int renderLimit, int logicHz)
+{
+	static GXFrameTimeStats<4096> main, pacing, wall;
+	static bool active = false;
+	static unsigned lastFrame = 0;
+	static std::chrono::steady_clock::time_point start;
+	const auto now = std::chrono::steady_clock::now();
+	if (!battle) { active=false; return; }
+	if (!active || logicFrame < lastFrame) {
+		active=true; main.reset(); pacing.reset(); wall.reset(); start=now;
+		fprintf(stderr, "[GX-PERF-CPU-FIRST] t=%.0fus logicFrame=%u mainWallMs=%.3f pacerMs=%.3f frameWallMs=%.3f (CPU; GPU/display latency unavailable)\n",
+			std::chrono::duration<double,std::micro>(now.time_since_epoch()).count(),logicFrame,
+			mainUs/1000.0,pacingUs/1000.0,(mainUs+pacingUs)/1000.0);
+	}
+	lastFrame=logicFrame;
+	main.add(mainUs/1000.0,0); pacing.add(pacingUs/1000.0,0); wall.add((mainUs+pacingUs)/1000.0,0);
+	if (std::chrono::duration<double>(now-start).count()<2.0) return;
+	fprintf(stderr, "[GX-PERF-CPU] t=%.0fus windowMs=%.3f logicFrame=%u samples=%zu dropped=%zu mainWallP50/P95/P99=%.3f/%.3f/%.3f pacerP50/P95/P99=%.3f/%.3f/%.3f frameWallP50/P95/P99=%.3f/%.3f/%.3f renderLimit=%d logicHz=%d fullTrace=%d netTrace=%d (ms; worker waits included in main)\n",
+		std::chrono::duration<double,std::micro>(now.time_since_epoch()).count(),std::chrono::duration<double,std::milli>(now-start).count(),logicFrame,main.count,main.dropped,
+		main.percentile(.50),main.percentile(.95),main.percentile(.99),
+		pacing.percentile(.50),pacing.percentile(.95),pacing.percentile(.99),
+		wall.percentile(.50),wall.percentile(.95),wall.percentile(.99),renderLimit,logicHz,(int)GXTrace::isEnabled(),(int)GXTrace::isNetEnabled());
+	const auto lookup = GXResourceStats::take(GXResourceStats::Lookup);
+	const auto big = GXResourceStats::take(GXResourceStats::BigRead);
+	fprintf(stderr,"[GX-PERF-RESOURCE] t=%.0fus lookup=%llu-calls/%.3fms eagerBIG=%llu-calls/%.1fKB/%.3fms (nested wall totals; streaming reads excluded)\n",
+		std::chrono::duration<double,std::micro>(now.time_since_epoch()).count(),
+		(unsigned long long)lookup.calls,lookup.us/1000.0,(unsigned long long)big.calls,big.bytes/1024.0,big.us/1000.0);
+	main.reset(); pacing.reset(); wall.reset(); start=now;
+}
+
 static void gxTraceEngineUpdatePhase(
 	double radarUs, double audioUs, double clientUs,
-	double networkUs, double logicUs, double stepUs)
+	double networkUs, double logicUs, double stepUs, double extraLogicUs,
+	bool battle, unsigned logicFrame, double mainUs)
 {
+	gxTraceBattleWindow(battle, logicFrame, mainUs);
 	static std::chrono::steady_clock::time_point s_windowStart = std::chrono::steady_clock::now();
 	static double s_radarUs = 0, s_audioUs = 0, s_clientUs = 0,
-		s_networkUs = 0, s_logicUs = 0, s_stepUs = 0;
+		s_networkUs = 0, s_logicUs = 0, s_stepUs = 0, s_extraLogicUs = 0;
 	static int s_frames = 0;
+	// GeneralsX @performance Android port 01/10/2026 Hitches. The averages above hide a single long
+	// frame; the owner sees a micro-stutter about every two seconds at a high frame rate. A frame is a
+	// hitch when it takes more than 1.8x the previous second's average (and over 25 ms); the worst one
+	// of each second is printed with its own split, so the phase that spiked is named.
+	static std::chrono::steady_clock::time_point s_lastFrame;
+	static double s_prevAvgMs = 0.0;
+	static int s_hitches = 0;
+	static double s_worstMs = 0.0, s_worstPhases[6] = {};
+
+	{
+		const std::chrono::steady_clock::time_point frameEnd = std::chrono::steady_clock::now();
+		if (s_lastFrame.time_since_epoch().count() != 0) {
+			const double frameMs = std::chrono::duration<double, std::milli>(frameEnd - s_lastFrame).count();
+			if (s_prevAvgMs > 0.0 && frameMs > 25.0 && frameMs > s_prevAvgMs * 1.8)
+				++s_hitches;
+			if (frameMs > s_worstMs) {
+				s_worstMs = frameMs;
+				const double phases[6] = { radarUs, audioUs, clientUs, networkUs, logicUs, stepUs };
+				for (int i = 0; i < 6; ++i)
+					s_worstPhases[i] = phases[i] / 1000.0;
+			}
+		}
+		s_lastFrame = frameEnd;
+	}
 
 	s_radarUs += radarUs;
 	s_audioUs += audioUs;
@@ -1179,13 +1390,14 @@ static void gxTraceEngineUpdatePhase(
 	s_networkUs += networkUs;
 	s_logicUs += logicUs;
 	s_stepUs += stepUs;
+	s_extraLogicUs += extraLogicUs;
 	++s_frames;
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 	double elapsedUs = std::chrono::duration<double, std::micro>(now - s_windowStart).count();
 	if (elapsedUs >= 1'000'000.0 && s_frames > 0)
 	{
-		GX_PERF_TRACE("[GX-PERF] frames=%d avgFrameMs=%.2f radar=%.2fms audio=%.2fms client=%.2fms network=%.2fms logic=%.2fms step=%.2fms\n",
+		GX_PERF_TRACE("[GX-PERF] frames=%d avgFrameMs=%.2f radar=%.2fms audio=%.2fms client=%.2fms network=%.2fms logic=%.2fms step=%.2fms extraLogic=%.2fms\n",
 			s_frames,
 			(elapsedUs / 1000.0) / s_frames,
 			s_radarUs / 1000.0 / s_frames,
@@ -1193,10 +1405,18 @@ static void gxTraceEngineUpdatePhase(
 			s_clientUs / 1000.0 / s_frames,
 			s_networkUs / 1000.0 / s_frames,
 			s_logicUs / 1000.0 / s_frames,
-			s_stepUs / 1000.0 / s_frames);
+			s_stepUs / 1000.0 / s_frames, s_extraLogicUs / 1000.0 / s_frames);
+
+		GX_PERF_TRACE("[GX-PERF-HITCH] hitches=%d worstFrameMs=%.1f (radar=%.1f audio=%.1f client=%.1f network=%.1f logic=%.1f step=%.1f) speedCatchUpSteps=%u\n",
+			s_hitches, s_worstMs, s_worstPhases[0], s_worstPhases[1], s_worstPhases[2], s_worstPhases[3],
+			s_worstPhases[4], s_worstPhases[5], s_gxCatchUpSteps);
+		s_gxCatchUpSteps = 0;
+		s_prevAvgMs = (elapsedUs / 1000.0) / s_frames;
+		s_hitches = 0;
+		s_worstMs = 0.0;
 
 		s_windowStart = now;
-		s_radarUs = s_audioUs = s_clientUs = s_networkUs = s_logicUs = s_stepUs = 0;
+		s_radarUs = s_audioUs = s_clientUs = s_networkUs = s_logicUs = s_stepUs = s_extraLogicUs = 0;
 		s_frames = 0;
 	}
 }
@@ -1210,6 +1430,8 @@ void GameEngine::update()
 		// this cheap ~1-line-per-second summary without also paying for
 		// (and drowning the exported log in) full GX_TRACE font/UI tracing.
 		const bool gxPerfTrace = GXTrace::isPerfEnabled();
+		const bool gxPerfBattle = gxPerfTrace && TheGameLogic->isInGame() &&
+			!TheGameLogic->isInShellGame() && !TheShell->isShellActive();
 		std::chrono::steady_clock::time_point gxT0, gxT1, gxT2, gxT3, gxT4, gxT5;
 
 		{
@@ -1223,10 +1445,15 @@ void GameEngine::update()
 				TheFramePacer->setFramesPerSecondLimit(NGMP_OnlineServicesManager::Settings.Graphics_GetFPSLimit());
 				TheWritableGlobalData->m_useFpsLimit = NGMP_OnlineServicesManager::Settings.Graphics_GetFPSLimit();
 			}
-			else
+			else if (!TheGameLogic->isInGame() || TheShell->isShellActive())
 			{
 				TheFramePacer->setFramesPerSecondLimit(GENERALS_ONLINE_HIGH_FPS_LIMIT);
 			}
+			// GeneralsX @bugfix Android port 28/09/2026 An offline game keeps the limit
+			// MSG_NEW_GAME set from the skirmish Game Speed slider (GameLogicDispatch.cpp). This
+			// block used to reset it to GENERALS_ONLINE_HIGH_FPS_LIMIT on every frame of every
+			// game, so the slider did nothing: a skirmish on 1.3.0 ran at 30 fps on a phone that
+			// ran it at 45-60 on 1.2.2, where this block did not exist.
 #endif
 
 			if (gxPerfTrace) gxT0 = std::chrono::steady_clock::now();
@@ -1281,6 +1508,10 @@ void GameEngine::update()
 			}
 		}
 
+		const auto gxCatchBegin = gxPerfTrace ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point();
+		gxCatchUpSpedUpLogic();
+		const double gxExtraLogicUs = gxPerfTrace ? std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-gxCatchBegin).count() : 0.0;
+
 		// GeneralsX @feature Android port 23/09/2026 Replay check: fast-forward extra
 		// logic frames and quit with a result file when asked to (GXReplayCheck.h).
 		GXReplayCheck::update();
@@ -1294,7 +1525,8 @@ void GameEngine::update()
 				std::chrono::duration<double, std::micro>(gxT2 - gxT1).count(),
 				std::chrono::duration<double, std::micro>(gxT3 - gxT2).count(),
 				std::chrono::duration<double, std::micro>(gxT4 - gxT3).count(),
-				logicUs, stepUs);
+				logicUs, stepUs, gxExtraLogicUs, gxPerfBattle, TheGameLogic->getFrame(),
+				std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - gxT0).count());
 		}
 	}
 }
@@ -1345,6 +1577,8 @@ void GameEngine::execute()
 	// pretty basic for now
 	while( !m_quitting )
 	{
+		const bool gxCpuPerf = GXTrace::isPerfEnabled();
+		const auto gxCpuStart = gxCpuPerf ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point();
 
 		//if (TheGlobalData->m_vTune)
 		{
@@ -1515,7 +1749,15 @@ void GameEngine::execute()
 				}
 			}
 
+			const auto gxPacerStart = gxCpuPerf ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point();
 			TheFramePacer->update();
+			if (gxCpuPerf) {
+				const auto end = std::chrono::steady_clock::now();
+				gxTraceCpuFrame(TheGameLogic->isInGame() && !TheGameLogic->isInShellGame() && !TheShell->isShellActive(),
+					TheGameLogic->getFrame(), std::chrono::duration<double,std::micro>(gxPacerStart-gxCpuStart).count(),
+					std::chrono::duration<double,std::micro>(end-gxPacerStart).count(),
+					TheFramePacer->getActualFramesPerSecondLimit(), LOGICFRAMES_PER_SECOND);
+			}
 
 			// NOTE: TheDisplay->draw() is called via TheGameClient->UPDATE() above.
 			// GameClient::update() dispatches TheDisplay->DRAW() each frame.

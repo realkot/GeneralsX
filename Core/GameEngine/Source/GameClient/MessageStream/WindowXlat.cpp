@@ -322,9 +322,17 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 			UnsignedByte key		= msg->getArgument( 0 )->integer;
 			UnsignedByte state	= msg->getArgument( 1 )->integer;
 
+#if defined(__ANDROID__)
+            // GeneralsX @bugfix Codex 14/10/2026 Text focus owns all keys, even ignored widget keys.
+            GameWindow *entryFocus = TheWindowManager ? TheWindowManager->winGetFocus() : nullptr;
+            const Bool editing = entryFocus && BitIsSet(entryFocus->winGetStyle(), GWS_ENTRY_FIELD);
+#endif
 			// process event through window system
 			if( TheWindowManager )
 				returnCode = TheWindowManager->winProcessKey( key, state );
+#if defined(__ANDROID__)
+            if (editing) returnCode = WIN_INPUT_USED;
+#endif
 
 
 			// If we're in a movie, we want to be able to escape out of it

@@ -1,3 +1,5 @@
+#include "GameNetwork/GeneralsOnline/HTTP/OnlineTLS.h"
+#include "GameNetwork/GeneralsOnline/HTTP/OnlineMessageBounds.h"
 #include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
 #include "GameNetwork/GeneralsOnline/NGMP_include.h"
 // GeneralsX @bugfix Android port 10/07/2026 NetworkPacket.h/NetworkBitstream.h
@@ -105,15 +107,7 @@ void WebSocket::Connect(const char* url, bool bIsReconnect, std::function<void(v
         // HTTP v1 seems to have a higher success rate of bypassing DPI
 		curl_easy_setopt(m_pCurlWS, CURLOPT_HTTP_VERSION, (long)NGMP_OnlineServicesManager::Settings.Network_GetHTTPVersionForCurl());
 
-#if _DEBUG
-		curl_easy_setopt(m_pCurlWS, CURLOPT_SSL_VERIFYPEER, 0);
-		curl_easy_setopt(m_pCurlWS, CURLOPT_SSL_VERIFYHOST, 0);
-
-		curl_easy_setopt(m_pCurlWS, CURLOPT_VERBOSE, 1L);
-#else
-		curl_easy_setopt(m_pCurlWS, CURLOPT_SSL_VERIFYPEER, 0);
-		curl_easy_setopt(m_pCurlWS, CURLOPT_SSL_VERIFYHOST, 0);
-#endif
+        GXConfigureOnlineTLS(m_pCurlWS, true);
 
 
 		// ws needs auth
@@ -646,9 +640,9 @@ void WebSocket::Tick()
 	CURLcode ret = CURL_LAST;
 	ret = curl_ws_recv(m_pCurlWS, bufferThisRecv, sizeof(bufferThisRecv), &rlen, &meta);
 
-	if (ret != CURLE_RECV_ERROR && ret != CURL_LAST && ret != CURLE_AGAIN && ret != CURLE_GOT_NOTHING)
+	if (ret == CURLE_OK && meta != nullptr)
 	{
-		NetworkLog(ELogVerbosity::LOG_DEBUG, "Got websocket msg: %s", bufferThisRecv);
+		NetworkLog(ELogVerbosity::LOG_DEBUG, "Got websocket msg: %.*s", static_cast<int>(rlen), bufferThisRecv);
 		NetworkLog(ELogVerbosity::LOG_DEBUG, "Got websocket len: %d", rlen);
 		NetworkLog(ELogVerbosity::LOG_DEBUG, "Got websocket flags: %d", meta->flags);
 
@@ -663,8 +657,14 @@ void WebSocket::Tick()
 			{
 				bool bMessageComplete = false;
 
-				m_vecWSPartialBuffer.resize(m_vecWSPartialBuffer.size() + rlen);
-				memcpy(m_vecWSPartialBuffer.data() + m_vecWSPartialBuffer.size() - rlen, bufferThisRecv, rlen);
+                if (!GXAppendOnlineFragment(m_vecWSPartialBuffer, bufferThisRecv, rlen)) {
+                    m_vecWSPartialBuffer.clear();
+                    m_bConnected = false;
+                    NGMP_OnlineServicesManager::GetInstance()->SetPendingFullTeardown(EGOTearDownReason::LOST_CONNECTION);
+                    NetworkLog(ELogVerbosity::LOG_RELEASE, "[WebSocket] Rejected oversized/invalid message");
+                    ReleaseLock();
+                    return;
+                }
 
 				if (meta->flags & CURLWS_CONT)
 				{
@@ -1296,7 +1296,8 @@ void WebSocket::Tick()
 			NetworkLog(ELogVerbosity::LOG_DEBUG, "websocket meta was null");
 		}
 	}
-	else if (ret == CURLE_RECV_ERROR)
+	else if ((ret != CURLE_OK && ret != CURLE_AGAIN && ret != CURLE_GOT_NOTHING) ||
+             (ret == CURLE_OK && meta == nullptr))
 	{
 
 		NetworkLog(ELogVerbosity::LOG_RELEASE, "Got websocket disconnect (ERROR: %s), Attempting reconnect", curl_easy_strerror(ret));

@@ -257,6 +257,11 @@
     <string name="online_button_datapacks_delete">Видалити</string>
     <string name="online_switch_datapacks">Використовувати патч даних спільноти</string>
     <string name="online_switch_datapacks_desc">Вимкнення не видаляє завантаження, але гра знову читає ретейл-дані, і ігри з ПК відмовлять цьому пристрою. Набуває чинності з наступним запуском гри.</string>
+    <string name="online_switch_datapacks_mods">Використовувати патч і з модами</string>
+    <string name="online_switch_datapacks_mods_desc">За замовчуванням патч не підключається, якщо в теці гри є мод, що змінює дані гри (наприклад, «Контра»): їхні файли змішалися б. Вмикайте, лише якщо мод зроблено під патч GeneralsOnline.</string>
+    <string name="online_datapacks_mod_found_skipped">Знайдено мод: %1$s. Патч спільноти з ним не використовується.</string>
+    <string name="online_datapacks_mod_found_forced">Знайдено мод: %1$s. Патч спільноти використовується разом із ним.</string>
+    <string name="online_datapacks_mod_none">Модів, що змінюють дані гри, у теці гри немає.</string>
     <string name="online_datapacks_chip_sign_in_first">Спершу увійдіть</string>
     <string name="online_datapacks_chip_required">Потрібно для гри в мережі — натисніть «Оновити»</string>
     <string name="online_datapacks_chip_off">Завантажено, але вимкнено</string>
@@ -322,4 +327,114 @@
     <string name="online_network_settings">Мережеві налаштування (сервери, сумісність із ПК): від %1$s, оновлюються автоматично з GitHub проєкту й підписані.</string>
     <string name="online_network_settings_builtin">Мережеві налаштування (сервери, сумісність із ПК): вбудовані в цю версію; нові прийдуть автоматично з GitHub проєкту.</string>
     <string name="online_datapacks_chip_update">Є оновлення</string>
+    <string name="setup_card_upscale">Апскейл (Snapdragon GSR)</string>
+    <string name="setup_upscale_off_short">Вимк</string>
+    <string name="setup_upscale_ultra_short">Ультра</string>
+    <string name="setup_upscale_quality_short">Якість</string>
+    <string name="setup_upscale_balanced_short">Баланс</string>
+    <string name="setup_upscale_performance_short">Продукт.</string>
+    <string name="setup_upscale_ultra">Ультраякість</string>
+    <string name="setup_upscale_quality">Якість</string>
+    <string name="setup_upscale_balanced">Баланс</string>
+    <string name="setup_upscale_performance">Продуктивність</string>
+    <string name="setup_upscale_status_off">Вимкнено: рендер у повній %1$d×%2$d</string>
+    <string name="setup_upscale_status">%1$s: 3D рендериться в %2$d×%3$d, апскейл до %4$d×%5$d</string>
+    <string name="setup_upscale_help">Поле бою малюється в меншій роздільності й чітко розтягується до повного екрана через Snapdragon GSR: більше кадрів, інтерфейс залишається чітким. Лише для GLES і ANGLE. Застосується при наступному запуску.</string>
+    <string name="setup_toast_render_scale_saved">Збережено. Застосується при наступному запуску гри.</string>
+    <string name="setup_card_interface_scale">Розмір інтерфейсу</string>
+    <string name="setup_interface_scale_label">%1$d%%</string>
+    <string name="setup_button_apply_interface_scale">Застосувати розмір інтерфейсу</string>
+    <string name="setup_interface_scale_help">Збільшує інтерфейс гри без зміни її файлів: нижня панель із картою росте вгору від краю екрана, а панель здібностей генерала, чат, повідомлення про події, список гравців, ігрове меню зі збереженням і налаштуваннями та кнопки головного меню ростуть від того місця, де розташовані. За екран нічого не виходить: кожна частина збільшується лише наскільки вміщується, тому на широкому телефоні нижня панель стає вищою, а не ширшою, а поле бою над нею — нижчим. Працює разом із «Розміром тексту меню». Застосовується при наступному запуску гри.</string>
+
+    <!-- GeneralsX @feature Android port 04/10/2026 Tactical mod library. -->
+    <string name="mods_library_subtitle">Керуйте встановленими модами та запускайте їх</string>
+    <string name="mods_library_title">Встановлені моди</string>
+    <string name="mods_storage_used">Використано</string>
+    <string name="mods_free_space">Вільне місце</string>
+    <string name="mods_size_unknown">Недоступно</string>
+    <string name="mods_installed_badge">Встановлено</string>
+    <string name="mods_launch_button">Запустити</string>
+    <string name="mods_library_loading">Читання бібліотеки модів…</string>
+    <string name="mods_library_empty">Тут з’являться встановлені моди. Імпортуйте папку, архів BIG або пакет ZIP.</string>
+    <string name="mods_brand_command" translatable="false">COMMAND &amp; CONQUER</string>
+    <string name="mods_brand_generals" translatable="false">GENERALS</string>
+    <string name="mods_brand_zero_hour" translatable="false">ZERO HOUR</string>
+
+    <!-- GeneralsX @feature Android port 04/10/2026 Tactical launcher presentation. -->
+    <string name="launcher_name" translatable="false">Generals Zero Hour</string>
+    <string name="launcher_ready">ГОТОВО</string>
+    <string name="launcher_setup_needed">ПОТРІБНЕ НАЛАШТУВАННЯ</string>
+    <string name="launcher_quick_access">Швидкий доступ</string>
+    <string name="launcher_game_data">Дані гри</string>
+    <string name="launcher_engine_build">Збірка рушія</string>
+    <string name="launcher_account">Обліковий запис</string>
+    <string name="launcher_play_now">Грати</string>
+    <string name="launcher_settings">Налаштування</string>
+    <string name="launcher_build_value">Збірка %1$d</string>
+    <string name="launcher_search_mods">Пошук модів</string>
+    <string name="launcher_no_matches">Жоден установлений мод не відповідає пошуку.</string>
+    <string name="launcher_signed_out">Немає входу</string>
+    <string name="launcher_play_options">Параметри запуску</string>
+    <string name="launcher_mods_hint">Керування модами</string>
+    <string name="launcher_graphics_hint">Налаштування гри</string>
+    <string name="launcher_data_hint">Налаштування і файли</string>
+    <string name="launcher_tools_hint">Журнали і діагностика</string>
+    <string name="mods_delete_button">Видалити</string>
+    <string name="mods_delete_confirm_title">Видалити мод?</string>
+    <string name="mods_delete_confirm">Назавжди видалити «%1$s» із керованої папки Mods?</string>
+    <string name="mods_delete_active_confirm">«%1$s» активний. Перед остаточним видаленням буде вибрано Vanilla. Продовжити?</string>
+    <string name="mods_delete_success">%1$s видалено.</string>
+    <string name="mods_delete_failed">Не вдалося повністю видалити %1$s. Перевірте доступ до сховища та повторіть спробу.</string>
+    <string name="mods_import_cancel_action">Скасувати імпорт</string>
+    <string name="mods_import_cancelling">Безпечне скасування…</string>
+    <string name="mods_import_cancelled">Імпорт скасовано. Установлені моди не змінено.</string>
+    <string name="setup_interface_scale_overlap_warning" formatted="false">Деякі моди замінюють макет панелі керування. Якщо елементи перекриваються, спочатку перевірте масштаб 100%. Зміна застосовується під час наступного запуску гри.</string>
+    <string name="setup_audio_check_ready">Потрібні аудіоархіви знайдено. Якщо у грі немає звуку, увімкніть журнал аудіо нижче та відтворіть проблему.</string>
+    <string name="setup_audio_check_missing">Відсутні потрібні аудіоархіви: %1$s</string>
+    <!-- GeneralsX @feature ChatGPT 10/10/2026 Engine transfer progress. -->
+    <string name="setup_updates_download_file">Завантаження %1$s (%2$d із %3$d)</string>
+    <string name="setup_updates_received_total">Отримано %1$s / %2$s</string>
+    <string name="setup_updates_received_unknown">Отримано %1$s</string>
+    <string name="setup_updates_verify_file">Перевірка %1$s…</string>
+    <string name="setup_updates_installing">Установлення перевіреного оновлення рушія…</string>
+    <string name="setup_updates_retry">Повторити</string>
+    <!-- GeneralsX @feature 10/10/2026 UI-only appearance settings. -->
+    <string name="setup_appearance_title">Оформлення</string>
+    <string name="setup_appearance_system">Система</string>
+    <string name="setup_appearance_light">День</string>
+    <string name="setup_appearance_dark">Ніч</string>
+    <string name="setup_appearance_help">Змінюється лише вигляд застосунку. Система наслідує налаштування телефону; вибір Дня чи Ночі зберігається. Графіка гри не змінюється.</string>
+    <!-- Tactical Home illustrated update summary. -->
+    <string name="launcher_latest_updates">Останні оновлення</string>
+    <string name="launcher_latest_updates_summary">Нові версії рушія надходять із GitHub із підписом. Перевірте їх у розділі оновлень.</string>
+    <!-- Preserved Mod Health Check strings. -->
+    <string name="mods_details_button">Деталі</string>
+    <string name="mods_details_title">Відомості та перевірка мода</string>
+    <string name="mods_health_scanning">Перевірка встановлених файлів…</string>
+    <string name="mods_health_unavailable">Не вдалося безпечно перевірити мод.</string>
+    <string name="mods_health_warning">Виявлено структурні помилки.</string>
+    <string name="mods_health_incomplete">Перевірку не завершено.</string>
+    <string name="mods_health_no_big">Архіви BIG не знайдено.</string>
+    <string name="mods_health_structural_ok">Індекси BIG перевірено (не тест гри).</string>
+    <string name="mods_health_big_count">Архіви BIG: %1$d</string>
+    <string name="mods_health_valid_count">Читабельні BIG: %1$d</string>
+    <string name="mods_health_invalid_count">Пошкоджені BIG: %1$d</string>
+    <string name="mods_health_entry_count">Записи BIG: %1$d</string>
+    <string name="mods_health_loose_count">Окремі файли: %1$d</string>
+    <string name="mods_health_nested_count">BIG у підтеках: %1$d</string>
+    <string name="mods_health_data_folder">Тека Data: %1$s</string>
+    <string name="mods_health_window_folder">Тека Window: %1$s</string>
+    <string name="mods_health_present">Є</string>
+    <string name="mods_health_absent">Немає</string>
+    <string name="mods_health_fs_issues">Пропущено посилань: %1$d · Непрочитані: %2$d</string>
+    <string name="mods_health_nested_warning">Порядок завантаження BIG у підтеках може відрізнятись.</string>
+    <string name="mods_health_invalid_files">Пошкоджені BIG (до 8):</string>
+    <string name="mods_health_disclaimer">Перевіряється лише структура, без змін файлів. Роботу моделей, щитів, звуків і скриптів у грі не підтверджено.</string>
+    <string name="setup_card_controls">Керування</string>
+    <string name="setup_switch_mouse_mode">Миша й тачпад</string>
+    <string name="setup_switch_mouse_mode_desc">Курсор замість дотиків: під’єднана миша працює як на ПК, а без неї палець рухає курсор, як тачпад ноутбука. Вимкнено: гра керується дотиками напряму.</string>
+    <string name="setup_mouse_mode_help">Тачпад: ведіть пальцем — курсор рухається. Дотик — лівий клік, два дотики — подвійний клік, дотик, а потім торкнутися й вести — рамка виділення. Дотик двома пальцями — правий клік. Два пальці — прокручування мапи, щипок — масштаб. Діє з наступного запуску гри. Що роблять ліва й права кнопки, як і раніше вирішує пункт гри «Альтернативне керування мишею». У меню, лобі та діалогах палець натискає напряму, як зазвичай.</string>
+    <string name="setup_cursor_size_label">Розмір курсора: %1$d%%</string>
+    <string name="setup_switch_skip_intro">Пропускати заставки</string>
+    <string name="setup_switch_skip_intro_desc">Логотипи EA, вступне відео та інші ролики перед меню не показуються — гра одразу переходить до завантаження. Для обох ігор, і з модами теж.</string>
 </resources>

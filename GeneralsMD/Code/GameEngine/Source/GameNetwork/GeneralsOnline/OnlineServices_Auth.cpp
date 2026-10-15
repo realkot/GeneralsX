@@ -239,9 +239,9 @@ void NGMP_OnlineServices_AuthInterface::BeginLogin()
 		m_strCode = GenerateGamecode();
 
 #if defined(USE_TEST_ENV)
-		std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}&client={}&env=test", m_strCode.c_str(), GENERALS_ONLINE_CLIENT_ID);
+		std::string strURI = std::format("https://www.playgenerals.online/login/?gamecode={}&client={}&env=test", m_strCode.c_str(), GENERALS_ONLINE_CLIENT_ID);
 #else
-		std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}&client={}", m_strCode.c_str(), GENERALS_ONLINE_CLIENT_ID);
+		std::string strURI = std::format("https://www.playgenerals.online/login/?gamecode={}&client={}", m_strCode.c_str(), GENERALS_ONLINE_CLIENT_ID);
 #endif
 
 		ClearGSMessageBoxes();
@@ -300,9 +300,9 @@ void NGMP_OnlineServices_AuthInterface::DoReAuth()
 	m_strCode = GenerateGamecode();
 
 #if defined(USE_TEST_ENV)
-	std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}&client={}&env=test", m_strCode.c_str(), GENERALS_ONLINE_CLIENT_ID);
+	std::string strURI = std::format("https://www.playgenerals.online/login/?gamecode={}&client={}&env=test", m_strCode.c_str(), GENERALS_ONLINE_CLIENT_ID);
 #else
-	std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}&client={}", m_strCode.c_str(), GENERALS_ONLINE_CLIENT_ID);
+	std::string strURI = std::format("https://www.playgenerals.online/login/?gamecode={}&client={}", m_strCode.c_str(), GENERALS_ONLINE_CLIENT_ID);
 #endif
 
 #if defined(_WIN32) && (!defined(_DEBUG) || defined(USE_TEST_ENV) || defined(USE_DEBUG_ON_LIVE_SERVER))

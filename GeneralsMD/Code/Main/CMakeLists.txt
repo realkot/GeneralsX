@@ -4,6 +4,10 @@
 # game remains a regular executable.
 if(ANDROID)
     add_library(z_generals SHARED)
+    # GeneralsX @build Codex 14/10/2026 Keep test saves separate from the installed release.
+    if("$ENV{GX_INPUT_TEST}" STREQUAL "1")
+        target_compile_definitions(z_generals PRIVATE GX_ANDROID_INPUT_TEST=1)
+    endif()
 else()
     add_executable(z_generals WIN32)
 endif()

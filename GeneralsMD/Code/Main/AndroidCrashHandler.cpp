@@ -1,3 +1,4 @@
+#include "GXAndroidIdentity.h"
 /*
 **	Command & Conquer Generals Zero Hour(tm)
 **	Copyright 2025 Electronic Arts Inc.
@@ -271,7 +272,7 @@ void computeCrashLogPath() {
 	}
 	int userId = (int)(getuid() / 100000);
 	snprintf(s_crashLogPath, sizeof(s_crashLogPath),
-		"/data/user/%d/com.generalsx.zerohour/files/crash.log", userId);
+		"/data/user/%d/" GX_ANDROID_APP_ID "/files/crash.log", userId);
 }
 
 // GeneralsX @bugfix Android port 30/07/2026 crash.log is append-only by
@@ -293,7 +294,7 @@ void rotatePrevCrashLog() {
 	int userId = (int)(getuid() / 100000);
 	char prevPath[256];
 	snprintf(prevPath, sizeof(prevPath),
-		"/data/user/%d/com.generalsx.zerohour/files/crash-prev.log", userId);
+		"/data/user/%d/" GX_ANDROID_APP_ID "/files/crash-prev.log", userId);
 	rename(s_crashLogPath, prevPath);
 }
 

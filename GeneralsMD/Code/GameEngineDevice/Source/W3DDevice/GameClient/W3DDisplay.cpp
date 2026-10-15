@@ -3297,6 +3297,31 @@ void W3DDisplay::drawRemainingRectClock(Int startX, Int startY, Int width, Int h
 /** Draws an images at the screen coordinates and keeps it within the end
 	* screen coords specified */
 //=============================================================================
+// GeneralsX @feature Codex 15/10/2026 Preserve the six approved HD control-panel atlases.
+static const char *gxHudTexture(const char *original)
+{
+#ifdef __ANDROID__
+    // GeneralsX @feature Codex 15/10/2026 Only the six retained control-panel atlases.
+    static const struct { const char *retail; const char *hd; } replacements[] = {
+#include "GXUiTextureMap.inc"
+    };
+    static Int available[sizeof(replacements)/sizeof(replacements[0])] = {};
+    const char *base = original;
+    for (const char *p=original;*p;++p)
+        if (*p=='/' || *p=='\\') base=p+1;
+    for (Int i=0;i<(Int)(sizeof(replacements)/sizeof(replacements[0]));++i) {
+        if (strcasecmp(base,replacements[i].retail)!=0) continue;
+        if (!available[i] && TheFileSystem) {
+            AsciiString path;path.format("Art\\Textures\\%s",replacements[i].hd);
+            available[i]=TheFileSystem->doesFileExist(path.str())?1:-1;
+            fprintf(stderr,"[GX-HDUI] %s: %s\n",base,available[i]>0?"4x atlas":"retail fallback");
+        }
+        return available[i]>0?replacements[i].hd:original;
+    }
+#endif
+    return original;
+}
+
 void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 														Int endX, Int endY, Color color, DrawImageMode mode)
 {
@@ -3328,7 +3353,7 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 	if (BitIsSet(image->getStatus(), IMAGE_STATUS_RAW_TEXTURE))
 		tex = (TextureClass *)(image->getRawTextureData());
 	else
-		tex = WW3DAssetManager::Get_Instance()->Get_Texture(image->getFilename().str(), MIP_LEVELS_1);
+		tex = WW3DAssetManager::Get_Instance()->Get_Texture(gxHudTexture(image->getFilename().str()), MIP_LEVELS_1);
 
 	Bool grayscale = (mode == DRAW_IMAGE_GRAYSCALE);
 	setup2DRenderState(tex, mode, grayscale);

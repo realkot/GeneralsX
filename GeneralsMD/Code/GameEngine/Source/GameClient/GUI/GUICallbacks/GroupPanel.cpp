@@ -76,11 +76,15 @@
 
 #include "PreRTS.h"
 
+#include "Common/GXSafeArea.h"
 #include "Common/MessageStream.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "GameClient/Color.h"
+#include "GameClient/Display.h"
+#include "GameClient/GXUiScale.h"
+#include "GameClient/GXArmyPanelLayout.h"
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
@@ -88,7 +92,105 @@
 #include "GameClient/WindowLayout.h"
 #include "GameClient/WinInstanceData.h"
 #include "GameLogic/Squad.h"
+#include "GameClient/Shell.h"
+#include "GameClient/GameText.h"
+#include "GameClient/GameFont.h"
+#include <cstdlib>
+#include <cstring>
+#include "GameClient/InGameUI.h"
+#include "GameLogic/GameLogic.h"
 
+// GeneralsX @feature Codex 14/10/2026 Explicit screen/map selection, on the game thread.
+static NameKeyType s_armyButtons[5] = { NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID, NAMEKEY_INVALID };
+static Bool s_armyLabelsSet = FALSE;
+
+static Bool canSelectArmy()
+{
+    return TheMessageStream && TheInGameUI && TheInGameUI->getInputEnabled()
+        && TheGameLogic && TheGameLogic->isInInteractiveGame() && TheGameLogic->getFrame() > 0
+        && !TheGameLogic->isGamePaused() && !(TheShell && TheShell->isShellActive())
+        && ThePlayerList && ThePlayerList->getLocalPlayer()
+        && ThePlayerList->getLocalPlayer()->isPlayerActive();
+}
+
+static void selectArmy(Bool acrossMap)
+{
+    if (!canSelectArmy()) return;
+    KindOfMaskType required, excluded;
+    excluded.set(KINDOF_DOZER);
+    excluded.set(KINDOF_HARVESTER);
+    excluded.set(KINDOF_IGNORES_SELECT_ALL);
+    excluded.set(KINDOF_STRUCTURE);
+    // The destroy/create group messages preserve the authoritative command group,
+    // including an empty result. Never use the screen-then-map toggle here.
+    TheInGameUI->deselectAllDrawables();
+    if (acrossMap) TheInGameUI->selectAllUnitsByTypeAcrossMap(required, excluded);
+    else TheInGameUI->selectAllUnitsByTypeAcrossScreen(required, excluded);
+}
+
+
+// GeneralsX @feature Codex 14/10/2026 Select combat aircraft with the retail mass-selection predicate.
+// Retail Comanche uses JetAIUpdate too; PRODUCED_AT_HELIPAD distinguishes helicopters.
+// Do not exclude TRANSPORT: the armed Helix is a helicopter as well as a transport.
+static void selectAirArmy(Bool helicopters)
+{
+    if (!canSelectArmy()) return;
+    KindOfMaskType required, excluded;
+    required.set(KINDOF_AIRCRAFT);
+    required.set(KINDOF_CAN_ATTACK);
+    if (helicopters) required.set(KINDOF_PRODUCED_AT_HELIPAD);
+    else excluded.set(KINDOF_PRODUCED_AT_HELIPAD);
+    excluded.set(KINDOF_DOZER);
+    excluded.set(KINDOF_HARVESTER);
+    excluded.set(KINDOF_IGNORES_SELECT_ALL);
+    excluded.set(KINDOF_STRUCTURE);
+    TheInGameUI->deselectAllDrawables();
+    TheInGameUI->selectAllUnitsByTypeAcrossMap(required, excluded);
+}
+
+// GeneralsX @selection Codex 14/10/2026 Reset the repeat cycle after any other selection.
+static Bool s_groundNextAcrossMap = FALSE;
+static UnsignedInt s_groundSelectionRevision = 0;
+static void selectGroundArmy()
+{
+    if (!canSelectArmy()) return;
+    if (TheInGameUI->getSelectionRevision() != s_groundSelectionRevision) s_groundNextAcrossMap = FALSE;
+    KindOfMaskType required, excluded;
+    required.set(KINDOF_CAN_ATTACK);
+    excluded.set(KINDOF_AIRCRAFT); excluded.set(KINDOF_DOZER); excluded.set(KINDOF_HARVESTER);
+    excluded.set(KINDOF_IGNORES_SELECT_ALL); excluded.set(KINDOF_STRUCTURE);
+    TheInGameUI->deselectAllDrawables();
+    if (s_groundNextAcrossMap) TheInGameUI->selectAllUnitsByTypeAcrossMap(required, excluded);
+    else TheInGameUI->selectAllUnitsByTypeAcrossScreen(required, excluded);
+    s_groundNextAcrossMap = !s_groundNextAcrossMap;
+    s_groundSelectionRevision = TheInGameUI->getSelectionRevision();
+}
+
+// Legacy language packs do not have the new compact labels. Honor the chosen text language.
+static const wchar_t *gxArmyLabelFallback(Int index)
+{
+    struct Labels { const char *language; const wchar_t *text[5]; };
+    static const Labels labels[] = {
+        {"english", {L"Screen", L"Map", L"Planes", L"Helis", L"Ground"}},
+        {"russian", {L"Экран", L"Карта", L"Самолёты", L"Вертол.", L"Наземные"}},
+        {"ukrainian", {L"Екран", L"Карта", L"Літаки", L"Гелікоп.", L"Наземні"}},
+        {"interslavic", {L"Ekran", L"Mapa", L"Aviony", L"Helikop.", L"Zemja"}},
+        {"arabic", {L"الشاشة", L"الخريطة", L"طائرات", L"مروحيات", L"برية"}},
+        {"brazilian", {L"Tela", L"Mapa", L"Aviões", L"Helicóp.", L"Terrest."}},
+        {"chinese", {L"屏幕", L"全图", L"战机", L"直升机", L"地面"}},
+        {"french", {L"Écran", L"Carte", L"Avions", L"Hélicos", L"Sol"}},
+        {"german", {L"Bild", L"Karte", L"Flieger", L"Helis", L"Boden"}},
+        {"korean", {L"화면", L"지도", L"전투기", L"헬기", L"지상군"}},
+        {"persian", {L"صفحه", L"نقشه", L"هواپیما", L"بالگرد", L"زمینی"}},
+        {"polish", {L"Ekran", L"Mapa", L"Samoloty", L"Śmigłow.", L"Lądowe"}},
+        {"spanish", {L"Pantalla", L"Mapa", L"Aviones", L"Helicóp.", L"Tierra"}},
+    };
+    const char *language = getenv("GENERALSX_TEXT_LANGUAGE");
+    for (const auto &entry : labels) if (language && strcmp(language, entry.language) == 0) return entry.text[index];
+    return labels[0].text[index];
+}
+
+static NameKeyType s_parentID = NAMEKEY_INVALID;
 static NameKeyType s_buttonHandleID = NAMEKEY_INVALID;
 static NameKeyType s_groupRowID = NAMEKEY_INVALID;
 static NameKeyType s_buttonGroupID[10];
@@ -106,8 +208,14 @@ static void cacheWidgetIDs()
 	if (s_buttonHandleID != NAMEKEY_INVALID) {
 		return; // already cached -- GWM_CREATE fires once per window in this layout
 	}
+	s_parentID = TheNameKeyGenerator->nameToKey("GroupPanel.wnd:GroupPanelParent");
 	s_buttonHandleID = TheNameKeyGenerator->nameToKey("GroupPanel.wnd:ButtonHandle");
 	s_groupRowID = TheNameKeyGenerator->nameToKey("GroupPanel.wnd:GroupRow");
+    const char *armyNames[5] = {"ArmyScreen", "ArmyMap", "ArmyPlanes", "ArmyHelicopters", "ArmyGround"};
+    for (Int i=0; i<5; ++i) {
+        char armyID[64]; sprintf(armyID, "GroupPanel.wnd:%s", armyNames[i]);
+        s_armyButtons[i] = TheNameKeyGenerator->nameToKey(armyID);
+    }
 	char buf[40];
 	for (Int i = 0; i < 10; ++i) {
 		sprintf(buf, "GroupPanel.wnd:ButtonGroup%d", i);
@@ -257,6 +365,73 @@ static void updateHoldVisuals()
 // every frame (see GroupPanelFollowControlBar below) makes the panel
 // mirror the bar's live screen position on every single frame, including
 // every frame of its slide-in/out animation.
+// GeneralsX @bugfix Android port 04/10/2026 Issue #33: the panel's root window must cover exactly
+// what is shown -- the handle, plus the row while it is open -- and nothing else.
+//
+// The window manager hit-tests by top-level window: the first one whose rectangle contains the
+// point is searched for a child, and the search stops there (getWindowUnderCursor(),
+// findWindowUnderMouse()). GroupPanelParent is authored as one rectangle around the handle and the
+// whole row, and it is NOINPUT, so over its empty parts the answer was "no window" -- and the
+// windows underneath it, the command bar's own buttons (the general's promotions among them), were
+// never reached. Worse, the cutout margin (02/10/2026) moved the handle and the row right but not
+// their parent, so the "9" button ended up outside the rectangle that is searched and could not be
+// pressed at all. Fitting the root to its visible children after every move and every open/close
+// fixes both: a point outside the buttons is outside the panel.
+static void fitParentToVisibleContent()
+{
+	if (!TheWindowManager) {
+		return;
+	}
+	GameWindow *parent = TheWindowManager->winGetWindowFromId(nullptr, s_parentID);
+	GameWindow *handle = TheWindowManager->winGetWindowFromId(nullptr, s_buttonHandleID);
+	GameWindow *row = TheWindowManager->winGetWindowFromId(nullptr, s_groupRowID);
+	if (!parent || !handle || !row) {
+		return;
+	}
+	Int hx, hy, hw, hh;
+	handle->winGetScreenPosition(&hx, &hy);
+	handle->winGetSize(&hw, &hh);
+	Int loX = hx, loY = hy, hiX = hx + hw, hiY = hy + hh;
+	if (!row->winIsHidden()) {
+		Int rx, ry, rw, rh;
+		row->winGetScreenPosition(&rx, &ry);
+		row->winGetSize(&rw, &rh);
+		loX = min(loX, rx);
+		loY = min(loY, ry);
+		hiX = max(hiX, rx + rw);
+		hiY = max(hiY, ry + rh);
+	}
+    for (Int i=0; i<5; ++i) {
+        GameWindow *button = TheWindowManager->winGetWindowFromId(nullptr, s_armyButtons[i]);
+        if (!button || button->winIsHidden()) continue;
+        Int bx,by,bw,bh; button->winGetScreenPosition(&bx,&by); button->winGetSize(&bw,&bh);
+        loX=min(loX,bx); loY=min(loY,by); hiX=max(hiX,bx+bw); hiY=max(hiY,by+bh);
+    }
+	Int px, py, pw, ph;
+	parent->winGetScreenPosition(&px, &py);
+	parent->winGetSize(&pw, &ph);
+	if (px == loX && py == loY && pw == hiX - loX && ph == hiY - loY) {
+		return;
+	}
+	// The children are placed relative to the root: move them back by however far the root moves,
+	// so nothing on screen shifts.
+	const Int dx = loX - px;
+	const Int dy = loY - py;
+	Int cx, cy;
+	handle->winGetPosition(&cx, &cy);
+	handle->winSetPosition(cx - dx, cy - dy);
+	row->winGetPosition(&cx, &cy);
+	row->winSetPosition(cx - dx, cy - dy);
+    for (Int i=0; i<5; ++i) {
+        GameWindow *button = TheWindowManager->winGetWindowFromId(nullptr, s_armyButtons[i]);
+        if (button) { button->winGetPosition(&cx,&cy); button->winSetPosition(cx-dx,cy-dy); }
+    }
+	Int ox, oy;
+	parent->winGetPosition(&ox, &oy);
+	parent->winSetPosition(ox + dx, oy + dy);
+	parent->winSetSize(hiX - loX, hiY - loY);
+}
+
 static Bool s_followOffsetCalibrated = FALSE;
 static Int s_followOffsetX = 0;
 static Int s_followOffsetY = 0;
@@ -275,40 +450,45 @@ void GroupPanelCalibrateFollowOffset(Int barScreenX, Int barScreenY)
 	s_followOffsetX = handleX - barScreenX;
 	s_followOffsetY = handleY - barScreenY;
 	s_followOffsetCalibrated = TRUE;
+	// GeneralsX @feature Android port 02/10/2026 Where the row's handle and the control bar are when
+	// the offset is taken, to check the interface scale moved both (GXUiScale.h).
+	fprintf(stderr, "[GX-UISCALE] group panel handle at %d,%d, control bar at %d,%d\n",
+		handleX, handleY, barScreenX, barScreenY);
 }
 
+// GeneralsX @feature Codex 15/10/2026 Place the army column in the HUD's left gap.
 void GroupPanelFollowControlBar(Int barScreenX, Int barScreenY, Bool visible)
 {
-	if (!visible || !s_followOffsetCalibrated) {
-		return;
-	}
-	if (!TheWindowManager) {
-		return;
-	}
-	GameWindow *handle = TheWindowManager->winGetWindowFromId(nullptr, s_buttonHandleID);
-	GameWindow *row = TheWindowManager->winGetWindowFromId(nullptr, s_groupRowID);
-	if (!handle || !row) {
-		return;
-	}
-
-	Int targetX = barScreenX + s_followOffsetX;
-	Int targetY = barScreenY + s_followOffsetY;
-
-	Int curX, curY;
-	handle->winGetScreenPosition(&curX, &curY);
-	Int dx = targetX - curX;
-	Int dy = targetY - curY;
-	if (dx == 0 && dy == 0) {
-		return;
-	}
-
-	Int hx, hy;
-	handle->winGetPosition(&hx, &hy);
-	handle->winSetPosition(hx + dx, hy + dy);
-
-	Int rx, ry;
-	row->winGetPosition(&rx, &ry);
-	row->winSetPosition(rx + dx, ry + dy);
+    if (!visible || !s_followOffsetCalibrated || !TheWindowManager || !TheDisplay) return;
+    GameWindow *parent = TheWindowManager->winGetWindowFromId(nullptr, s_parentID);
+    GameWindow *handle = TheWindowManager->winGetWindowFromId(nullptr, s_buttonHandleID);
+    GameWindow *row = TheWindowManager->winGetWindowFromId(nullptr, s_groupRowID);
+    if (!parent || !handle || !row) return;
+    const GXUiScale::Transform &bar = GXUiScale::forLayout("ControlBar.wnd");
+    const GXArmyPanelLayout::Layout box = GXArmyPanelLayout::calculate(
+        TheDisplay->getWidth(), TheDisplay->getHeight(), barScreenX, barScreenY,
+        GXSafeArea::leftPx(), GXSafeArea::bottomPx(), bar.fontK);
+    Int px,py;
+    parent->winGetScreenPosition(&px,&py);
+    handle->winSetPosition(box.x-px,box.y-py);
+    handle->winSetSize(box.width,box.height);
+    for (Int i=0;i<5;++i) {
+        GameWindow *button = TheWindowManager->winGetWindowFromId(nullptr,s_armyButtons[i]);
+        if (!button) continue;
+        button->winSetPosition(box.x-px,box.y+(i+1)*(box.height+box.gap)-py);
+        button->winSetSize(box.width,box.height);
+    }
+    row->winSetPosition(box.rowX-px,box.rowY-py);
+    row->winSetSize(box.columns*box.cellWidth+(box.columns-1)*box.gap,
+        box.rows*box.cellHeight+(box.rows-1)*box.gap);
+    for (Int i=0;i<10;++i) {
+        GameWindow *button = TheWindowManager->winGetWindowFromId(nullptr,s_buttonGroupID[i]);
+        if (!button) continue;
+        button->winSetPosition((i%box.columns)*(box.cellWidth+box.gap),
+            (i/box.columns)*(box.cellHeight+box.gap));
+        button->winSetSize(box.cellWidth,box.cellHeight);
+    }
+    fitParentToVisibleContent();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -316,6 +496,8 @@ void GroupPanelInit(WindowLayout *layout, void *userData)
 {
 	(void)layout;
 	(void)userData;
+	s_groundNextAcrossMap = FALSE;
+	s_groundSelectionRevision = TheInGameUI ? TheInGameUI->getSelectionRevision() : 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -324,6 +506,32 @@ void GroupPanelUpdate(WindowLayout *layout, void *userData)
 	(void)layout;
 	(void)userData;
 	updateHoldVisuals();
+    if (!TheWindowManager) return;
+    const Bool enabled = canSelectArmy();
+    for (Int i=0; i<5; ++i) {
+        GameWindow *button = TheWindowManager->winGetWindowFromId(nullptr, s_armyButtons[i]);
+        if (!button) continue;
+        button->winEnable(enabled);
+        // Existing installed language packs may predate these labels: use a readable fallback.
+        if (TheGameText && !s_armyLabelsSet) {
+            Bool exists = FALSE;
+            const char *keys[5] = {"GUI:ArmyScreenShort", "GUI:ArmyMapShort", "GUI:ArmyPlanesShort", "GUI:ArmyHelicoptersShort", "GUI:ArmyGround"};
+            UnicodeString label = TheGameText->fetch(keys[i], &exists);
+            if (!exists) label = UnicodeString(gxArmyLabelFallback(i));
+            if (button->winGetText() != label) GadgetButtonSetText(button, label);
+        }
+    }
+    if (TheGameText && !s_armyLabelsSet) {
+        GameWindow *handle = TheWindowManager->winGetWindowFromId(nullptr, s_buttonHandleID);
+        if (handle) GadgetButtonSetText(handle, UnicodeString(L"+"));
+        // GeneralsX @bugfix Codex 15/10/2026 Group digits are literal text, not localization keys.
+        for (Int group=0; group<10; ++group) {
+            GameWindow *button = TheWindowManager->winGetWindowFromId(nullptr, s_buttonGroupID[group]);
+            UnicodeString digit; digit.format(L"%d", group);
+            if (button) GadgetButtonSetText(button, digit);
+        }
+        s_armyLabelsSet = TRUE;
+    }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -364,6 +572,7 @@ WindowMsgHandledType GroupPanelSystem(GameWindow *window, UnsignedInt msg,
 		}
 
 		case GWM_DESTROY:
+			s_armyLabelsSet = FALSE;
 			break;
 
 		case GBM_SELECTED:
@@ -371,12 +580,22 @@ WindowMsgHandledType GroupPanelSystem(GameWindow *window, UnsignedInt msg,
 			GameWindow *control = (GameWindow *)mData1;
 			Int controlID = control->winGetWindowId();
 
+            if (controlID == s_armyButtons[4]) { selectGroundArmy(); return MSG_HANDLED; }
+            if (controlID == s_armyButtons[2] || controlID == s_armyButtons[3]) {
+                selectAirArmy(controlID == s_armyButtons[3]);
+                return MSG_HANDLED;
+            }
+            if (controlID == s_armyButtons[0] || controlID == s_armyButtons[1]) {
+                selectArmy(controlID == s_armyButtons[1]);
+                return MSG_HANDLED;
+            }
 			if (controlID == s_buttonHandleID) {
 				s_groupRowExpanded = !s_groupRowExpanded;
 				GameWindow *groupRow = TheWindowManager->winGetWindowFromId(nullptr, s_groupRowID);
 				if (groupRow) {
 					groupRow->winHide(!s_groupRowExpanded);
 				}
+				fitParentToVisibleContent();
 				return MSG_HANDLED;
 			}
 

@@ -284,6 +284,12 @@ public:
 																									 messages and put them on the
 																									 stream for the raw state. */
 
+    // GeneralsX @bugfix Codex 14/10/2026 A pointer may aim with no button held; touch cannot.
+    virtual Bool hasContinuousPointer() const { return TRUE; }
+    // GeneralsX @input Codex 15/10/2026 Compare clicks in pointer-window units, not upscaled render pixels.
+    void getClickToleranceScale(Real &x, Real &y) const;
+    static void setClickToleranceScale(Real x, Real y);
+    Bool isClickDistance(const ICoord2D &delta) const;
 	virtual void draw() override;													///< draw the mouse
 	virtual void setPosition( Int x, Int y );						///< set the mouse position
 	virtual void setCursor( MouseCursor cursor ) = 0;		///< set mouse cursor

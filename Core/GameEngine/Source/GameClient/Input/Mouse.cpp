@@ -52,6 +52,10 @@
 
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 Mouse *TheMouse = nullptr;
+// GeneralsX @bugfix Codex 15/10/2026 Device-fed tolerance preserves the retail Mouse vtable and layout.
+static Real s_gxMouseClickScaleX = 1.0f, s_gxMouseClickScaleY = 1.0f;
+void Mouse::getClickToleranceScale(Real &x, Real &y) const { x = s_gxMouseClickScaleX; y = s_gxMouseClickScaleY; }
+void Mouse::setClickToleranceScale(Real x, Real y) { s_gxMouseClickScaleX = x; s_gxMouseClickScaleY = y; }
 
 const char *const Mouse::RedrawModeName[] = {
 	"Mouse:Windows",
@@ -161,18 +165,13 @@ void Mouse::updateMouseData()
 
 		busy = TRUE;
 
-		// Get latest mouse events from DirectX
-		do
-		{
-			do
-			{
-				result = getMouseEvent( &m_mouseEvents[ index ], TRUE );
-			}
-			while( result == MOUSE_LOST );
-			index++;
+		// GeneralsX @bugfix Codex 14/10/2026 Never discard the final event of a full frame.
+		while (index < sizeof(m_mouseEvents) / sizeof(MouseIO)) {
+			do { result = getMouseEvent(&m_mouseEvents[index], TRUE); }
+			while (result == MOUSE_LOST);
+			if (result != MOUSE_OK) break;
+			++index;
 		}
-		while( (result != MOUSE_NONE) &&
-					 (index < sizeof( m_mouseEvents ) / sizeof( MouseIO )) );
 
 		busy = FALSE;
 
@@ -181,7 +180,7 @@ void Mouse::updateMouseData()
 	if( index > 0 ) {
 		// GeneralsX @bugfix BenderAI 17/02/2026 Debug mouse events
 		//fprintf(stderr, "[MOUSE] updateMouseData: %d events this frame\n", index - 1);
-		m_eventsThisFrame = index - 1;
+		m_eventsThisFrame = index;
 	} else
 		m_eventsThisFrame = 0;
 
@@ -386,6 +385,19 @@ void Mouse::checkForDrag()
 //-------------------------------------------------------------------------------------------------
 /** Check for mouse click, using allowed drag forgiveness */
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @input Codex 15/10/2026 One distance predicate for meta clicks, drag selection and commands.
+Bool Mouse::isClickDistance(const ICoord2D &delta) const
+{
+    Real sx, sy;
+    getClickToleranceScale(sx, sy);
+    if (sx <= 0.0f) sx = 1.0f;
+    if (sy <= 0.0f) sy = 1.0f;
+    // Endpoint scaling rounds to integer game pixels; allow that quantization at non-1:1 resolution.
+    const Real dx = max(0.0f, fabsf((Real)delta.x) - (sx == 1.0f ? 0.0f : 1.0f)) / sx;
+    const Real dy = max(0.0f, fabsf((Real)delta.y) - (sy == 1.0f ? 0.0f : 1.0f)) / sy;
+    return dx * dx + dy * dy <= (Real)m_dragTolerance * (Real)m_dragTolerance;
+}
+
 Bool Mouse::isClick(
 	const ICoord2D &mouseAnchor0,
 	const ICoord2D &mouseAnchor1,
@@ -402,7 +414,7 @@ Bool Mouse::isClick(
 	// or the click took less than the tolerance duration
 	// TheSuperHackers @bugfix Now compares the distance in a circle instead of a rectangle.
 	if ( timeMsDelta > m_dragToleranceMS
-		|| mouseAnchorDelta.lengthSqr() > sqr(m_dragTolerance)
+		|| !isClickDistance(mouseAnchorDelta)
 		|| cameraPosDelta.lengthSqr() > sqr(m_dragTolerance3D) )
 	{
 		return FALSE;

@@ -257,6 +257,11 @@
     <string name="online_button_datapacks_delete">حذف</string>
     <string name="online_switch_datapacks">استفاده از وصله داده‌های انجمن</string>
     <string name="online_switch_datapacks_desc">خاموش‌کردن فایل‌های دانلودشده را نگه می‌دارد، اما بازی دوباره داده‌های اصلی را می‌خواند و بازی‌های رایانه این دستگاه را نمی‌پذیرند. از اجرای بعدی بازی اعمال می‌شود.</string>
+    <string name="online_switch_datapacks_mods">استفاده از وصله همراه با ماد</string>
+    <string name="online_switch_datapacks_mods_desc">به‌طور پیش‌فرض اگر در پوشهٔ بازی مادی باشد که داده‌های بازی را تغییر می‌دهد (مثل Contra)، وصله بارگذاری نمی‌شود: فایل‌هایشان قاطی می‌شوند. فقط برای مادی روشن کنید که برای وصلهٔ GeneralsOnline ساخته شده است.</string>
+    <string name="online_datapacks_mod_found_skipped">ماد پیدا شد: %1$s. وصلهٔ جامعه همراه آن استفاده نمی‌شود.</string>
+    <string name="online_datapacks_mod_found_forced">ماد پیدا شد: %1$s. وصلهٔ جامعه همراه آن استفاده می‌شود.</string>
+    <string name="online_datapacks_mod_none">در پوشهٔ بازی مادی که داده‌های بازی را تغییر دهد نیست.</string>
     <string name="online_datapacks_chip_sign_in_first">ابتدا وارد شوید</string>
     <string name="online_datapacks_chip_required">برای بازی آنلاین لازم است — «به‌روزرسانی» را بزنید</string>
     <string name="online_datapacks_chip_off">دانلود شده، اما خاموش است</string>
@@ -322,4 +327,114 @@
     <string name="online_network_settings">تنظیمات شبکه (سرورها، سازگاری با رایانه): مورخ %1$s، به‌طور خودکار از GitHub پروژه به‌روز و امضا می‌شوند.</string>
     <string name="online_network_settings_builtin">تنظیمات شبکه (سرورها، سازگاری با رایانه): درون این نسخه؛ نسخه‌های تازه به‌طور خودکار از GitHub پروژه می‌آیند.</string>
     <string name="online_datapacks_chip_update">به‌روزرسانی موجود است</string>
+    <string name="setup_card_upscale">افزایش وضوح (Snapdragon GSR)</string>
+    <string name="setup_upscale_off_short">خاموش</string>
+    <string name="setup_upscale_ultra_short">فوق‌العاده</string>
+    <string name="setup_upscale_quality_short">کیفیت</string>
+    <string name="setup_upscale_balanced_short">متعادل</string>
+    <string name="setup_upscale_performance_short">کارایی</string>
+    <string name="setup_upscale_ultra">کیفیت فوق‌العاده</string>
+    <string name="setup_upscale_quality">کیفیت</string>
+    <string name="setup_upscale_balanced">متعادل</string>
+    <string name="setup_upscale_performance">کارایی</string>
+    <string name="setup_upscale_status_off">خاموش: رندر با وضوح کامل %1$d×%2$d</string>
+    <string name="setup_upscale_status">%1$s: سه‌بعدی با %2$d×%3$d رندر و تا %4$d×%5$d بزرگ می‌شود</string>
+    <string name="setup_upscale_help">میدان نبرد با وضوح کمتر کشیده می‌شود و Snapdragon GSR آن را واضح تا تمام صفحه بزرگ می‌کند: فریم بیشتر، رابط کاربری واضح می‌ماند. فقط GLES و ANGLE. در اجرای بعدی اعمال می‌شود.</string>
+    <string name="setup_toast_render_scale_saved">ذخیره شد. در اجرای بعدی بازی اعمال می‌شود.</string>
+    <string name="setup_card_interface_scale">اندازه رابط کاربری</string>
+    <string name="setup_interface_scale_label">%1$d%%</string>
+    <string name="setup_button_apply_interface_scale">اعمال اندازه رابط کاربری</string>
+    <string name="setup_interface_scale_help">رابط کاربری بازی را بدون تغییر فایل‌های آن بزرگ می‌کند: نوار کنترل همراه رادار از لبه پایین به بالا بزرگ می‌شود و نوار قدرت‌های ژنرال، چت، پیام‌های رویداد، فهرست بازیکنان، منوی بازی با ذخیره/بارگذاری و تنظیمات و دکمه‌های منوی اصلی از جای خود بزرگ می‌شوند. هیچ چیز از صفحه بیرون نمی‌رود: هر بخش فقط تا جایی که جا شود بزرگ می‌شود، پس در گوشی عریض نوار کنترل به‌جای پهن‌تر شدن بلندتر می‌شود و میدان نبرد بالای آن کوتاه‌تر. همراه با اندازه متن منو کار می‌کند. در اجرای بعدی بازی اعمال می‌شود.</string>
+
+    <!-- GeneralsX @feature Android port 04/10/2026 Tactical mod library. -->
+    <string name="mods_library_subtitle">مدیریت و اجرای مادهای نصب‌شده</string>
+    <string name="mods_library_title">مادهای نصب‌شده</string>
+    <string name="mods_storage_used">فضای استفاده‌شده</string>
+    <string name="mods_free_space">فضای آزاد</string>
+    <string name="mods_size_unknown">ناموجود</string>
+    <string name="mods_installed_badge">نصب‌شده</string>
+    <string name="mods_launch_button">اجرا</string>
+    <string name="mods_library_loading">در حال خواندن کتابخانه مادها…</string>
+    <string name="mods_library_empty">مادهای نصب‌شده اینجا نمایش داده می‌شوند. یک پوشه، آرشیو BIG یا بسته ZIP وارد کنید.</string>
+    <string name="mods_brand_command" translatable="false">COMMAND &amp; CONQUER</string>
+    <string name="mods_brand_generals" translatable="false">GENERALS</string>
+    <string name="mods_brand_zero_hour" translatable="false">ZERO HOUR</string>
+
+    <!-- GeneralsX @feature Android port 04/10/2026 Tactical launcher presentation. -->
+    <string name="launcher_name" translatable="false">Generals Zero Hour</string>
+    <string name="launcher_ready">آماده</string>
+    <string name="launcher_setup_needed">نیاز به راه‌اندازی</string>
+    <string name="launcher_quick_access">دسترسی سریع</string>
+    <string name="launcher_game_data">داده‌های بازی</string>
+    <string name="launcher_engine_build">نسخهٔ موتور</string>
+    <string name="launcher_account">حساب</string>
+    <string name="launcher_play_now">شروع بازی</string>
+    <string name="launcher_settings">تنظیمات</string>
+    <string name="launcher_build_value">ساخت %1$d</string>
+    <string name="launcher_search_mods">جستجوی مودها</string>
+    <string name="launcher_no_matches">هیچ مود نصب‌شده‌ای با جستجوی شما مطابقت ندارد.</string>
+    <string name="launcher_signed_out">وارد نشده</string>
+    <string name="launcher_play_options">گزینه‌های بازی</string>
+    <string name="launcher_mods_hint">مدیریت مودها</string>
+    <string name="launcher_graphics_hint">تنظیمات بازی</string>
+    <string name="launcher_data_hint">راه‌اندازی و فایل‌ها</string>
+    <string name="launcher_tools_hint">گزارش‌ها و عیب‌یابی</string>
+    <string name="mods_delete_button">حذف</string>
+    <string name="mods_delete_confirm_title">ماد حذف شود؟</string>
+    <string name="mods_delete_confirm">«%1$s» برای همیشه از پوشهٔ مدیریت‌شدهٔ Mods حذف شود؟</string>
+    <string name="mods_delete_active_confirm">«%1$s» فعال است. با حذف دائمی آن ابتدا Vanilla انتخاب می‌شود. ادامه می‌دهید؟</string>
+    <string name="mods_delete_success">%1$s حذف شد.</string>
+    <string name="mods_delete_failed">حذف کامل %1$s ممکن نشد. دسترسی به حافظه را بررسی و دوباره تلاش کنید.</string>
+    <string name="mods_import_cancel_action">لغو وارد کردن</string>
+    <string name="mods_import_cancelling">در حال لغو ایمن…</string>
+    <string name="mods_import_cancelled">وارد کردن لغو شد. مادهای نصب‌شده تغییر نکردند.</string>
+    <string name="setup_interface_scale_overlap_warning" formatted="false">برخی مادها چیدمان نوار کنترل را جایگزین می‌کنند. اگر عناصر روی هم افتادند، ابتدا ۱۰۰٪ را امتحان کنید. تغییر در اجرای بعدی بازی اعمال می‌شود.</string>
+    <string name="setup_audio_check_ready">آرشیوهای صوتی لازم پیدا شدند. اگر بازی بی‌صداست، گزارش صدا را در پایین فعال و مشکل را تکرار کنید.</string>
+    <string name="setup_audio_check_missing">آرشیوهای صوتی لازم موجود نیستند: %1$s</string>
+    <!-- GeneralsX @feature ChatGPT 10/10/2026 Engine transfer progress. -->
+    <string name="setup_updates_download_file">در حال دریافت %1$s (فایل %2$d از %3$d)</string>
+    <string name="setup_updates_received_total">دریافت‌شده %1$s از %2$s</string>
+    <string name="setup_updates_received_unknown">دریافت‌شده %1$s</string>
+    <string name="setup_updates_verify_file">در حال تأیید %1$s…</string>
+    <string name="setup_updates_installing">در حال نصب به‌روزرسانی تأییدشده موتور…</string>
+    <string name="setup_updates_retry">تلاش دوباره</string>
+    <!-- GeneralsX @feature 10/10/2026 UI-only appearance settings. -->
+    <string name="setup_appearance_title">ظاهر برنامه</string>
+    <string name="setup_appearance_system">سیستم</string>
+    <string name="setup_appearance_light">روز</string>
+    <string name="setup_appearance_dark">شب</string>
+    <string name="setup_appearance_help">فقط ظاهر برنامه تغییر می‌کند. حالت سیستم از تنظیمات گوشی پیروی می‌کند و روز و شب ذخیره می‌شوند. گرافیک بازی تغییر نمی‌کند.</string>
+    <!-- Tactical Home illustrated update summary. -->
+    <string name="launcher_latest_updates">آخرین به‌روزرسانی‌ها</string>
+    <string name="launcher_latest_updates_summary">نسخه‌های جدید موتور با امضای معتبر از GitHub دریافت می‌شوند. از بخش به‌روزرسانی‌ها بررسی کنید.</string>
+    <!-- Preserved Mod Health Check strings. -->
+    <string name="mods_details_button">جزئیات</string>
+    <string name="mods_details_title">جزئیات ماد و بررسی فایل‌ها</string>
+    <string name="mods_health_scanning">در حال بررسی فایل‌ها…</string>
+    <string name="mods_health_unavailable">بررسی ایمن ماد ممکن نیست.</string>
+    <string name="mods_health_warning">مشکلات ساختاری پیدا شد.</string>
+    <string name="mods_health_incomplete">بررسی کامل نشد.</string>
+    <string name="mods_health_no_big">هیچ آرشیو BIG یافت نشد.</string>
+    <string name="mods_health_structural_ok">ساختار فهرست BIG بررسی شد (نه آزمون بازی).</string>
+    <string name="mods_health_big_count">آرشیوهای BIG: %1$d</string>
+    <string name="mods_health_valid_count">BIG قابل خواندن: %1$d</string>
+    <string name="mods_health_invalid_count">BIG نامعتبر: %1$d</string>
+    <string name="mods_health_entry_count">ورودی‌های BIG: %1$d</string>
+    <string name="mods_health_loose_count">فایل‌های جداگانه: %1$d</string>
+    <string name="mods_health_nested_count">BIG در پوشه فرعی: %1$d</string>
+    <string name="mods_health_data_folder">پوشه Data: %1$s</string>
+    <string name="mods_health_window_folder">پوشه Window: %1$s</string>
+    <string name="mods_health_present">موجود</string>
+    <string name="mods_health_absent">پیدا نشد</string>
+    <string name="mods_health_fs_issues">پیوندهای رد شده: %1$d · موارد ناخوانا: %2$d</string>
+    <string name="mods_health_nested_warning">ترتیب بارگذاری BIGهای پوشه‌های فرعی ممکن است متفاوت باشد.</string>
+    <string name="mods_health_invalid_files">فایل‌های BIG نامعتبر (حداکثر ۸):</string>
+    <string name="mods_health_disclaimer">این بررسی فقط ساختار فایل را بدون تغییر می‌سنجد و کارکرد مدل‌ها، سپرها، صدا یا اسکریپت‌ها را در بازی تأیید نمی‌کند.</string>
+    <string name="setup_card_controls">کنترل</string>
+    <string name="setup_switch_mouse_mode">ماوس و تاچ‌پد</string>
+    <string name="setup_switch_mouse_mode_desc">نشانگر به‌جای لمس جای دلخواه: ماوسِ وصل‌شده مثل رایانه کار می‌کند و بدون آن، انگشت شما نشانگر را مثل تاچ‌پد لپ‌تاپ حرکت می‌دهد. خاموش: بازی مستقیم با لمس کنترل می‌شود.</string>
+    <string name="setup_mouse_mode_help">تاچ‌پد: انگشت را حرکت دهید تا نشانگر حرکت کند. ضربه = کلیک چپ، دو ضربه = دابل‌کلیک، ضربه و سپس لمس و کشیدن = کادر انتخاب. ضربهٔ دوانگشتی = کلیک راست. دو انگشت = جابه‌جایی نقشه، نیشگون = بزرگ‌نمایی. از اجرای بعدی بازی اعمال می‌شود. گزینهٔ «تنظیم جایگزین ماوس» خود بازی همچنان تعیین می‌کند دکمه‌های چپ و راست چه کنند. در منوها، لابی و پنجره‌های گفتگو انگشت مثل همیشه مستقیم می‌زند.</string>
+    <string name="setup_cursor_size_label">اندازهٔ نشانگر: %1$d%%</string>
+    <string name="setup_switch_skip_intro">رد کردن ویدیوهای آغازین</string>
+    <string name="setup_switch_skip_intro_desc">لوگوهای EA، ویدیوی آغازین و ویدیوهای دیگر پیش از منو رد می‌شوند و بازی مستقیم بارگذاری می‌شود. برای هر دو بازی، با مادها هم.</string>
 </resources>

@@ -33,6 +33,12 @@ endif()
 # Top level project, doesn't really affect anything.
 project(genzh LANGUAGES C CXX)
 
+# GeneralsX @build Codex 14/10/2026 Native markers/crash logs must follow the isolated test package.
+if(ANDROID AND "$ENV{GX_INPUT_TEST}" STREQUAL "1")
+    add_compile_definitions(GX_ANDROID_APP_ID="com.generalsx.zerohour.inputtest")
+endif()
+
+
 # GeneralsX @build BenderAI 10/02/2026
 # Linux port: Make CompatLib headers globally accessible so Core libraries (WWLib, WWMath, etc.)
 # can access platform compatibility types when building for non-Windows platforms

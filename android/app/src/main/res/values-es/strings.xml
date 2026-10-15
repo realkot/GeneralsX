@@ -257,6 +257,11 @@
     <string name="online_button_datapacks_delete">Eliminar</string>
     <string name="online_switch_datapacks">Usar el parche de datos de la comunidad</string>
     <string name="online_switch_datapacks_desc">Desactivarlo conserva la descarga, pero el juego vuelve a leer los datos originales y las partidas de PC rechazarán este dispositivo. Se aplica al iniciar el juego la próxima vez.</string>
+    <string name="online_switch_datapacks_mods">Usar el parche también con mods</string>
+    <string name="online_switch_datapacks_mods_desc">Por defecto el parche no se carga si la carpeta del juego tiene un mod que cambia los datos del juego (como Contra): sus archivos se mezclarían. Actívalo solo para un mod hecho para el parche de GeneralsOnline.</string>
+    <string name="online_datapacks_mod_found_skipped">Mod encontrado: %1$s. El parche de la comunidad no se usa con él.</string>
+    <string name="online_datapacks_mod_found_forced">Mod encontrado: %1$s. El parche de la comunidad se usa junto con él.</string>
+    <string name="online_datapacks_mod_none">No hay en la carpeta del juego ningún mod que cambie los datos del juego.</string>
     <string name="online_datapacks_chip_sign_in_first">Inicie sesión primero</string>
     <string name="online_datapacks_chip_required">Necesario para jugar en línea: pulse Actualizar</string>
     <string name="online_datapacks_chip_off">Descargado, pero desactivado</string>
@@ -322,4 +327,114 @@
     <string name="online_network_settings">Ajustes de red (servidores, compatibilidad con PC): del %1$s, actualizados automáticamente desde el GitHub del proyecto y firmados.</string>
     <string name="online_network_settings_builtin">Ajustes de red (servidores, compatibilidad con PC): incluidos en esta versión; los nuevos llegarán automáticamente desde el GitHub del proyecto.</string>
     <string name="online_datapacks_chip_update">Actualización disponible</string>
+    <string name="setup_card_upscale">Reescalado (Snapdragon GSR)</string>
+    <string name="setup_upscale_off_short">No</string>
+    <string name="setup_upscale_ultra_short">Ultra</string>
+    <string name="setup_upscale_quality_short">Calidad</string>
+    <string name="setup_upscale_balanced_short">Equilib.</string>
+    <string name="setup_upscale_performance_short">Rend.</string>
+    <string name="setup_upscale_ultra">Ultracalidad</string>
+    <string name="setup_upscale_quality">Calidad</string>
+    <string name="setup_upscale_balanced">Equilibrado</string>
+    <string name="setup_upscale_performance">Rendimiento</string>
+    <string name="setup_upscale_status_off">Desactivado: se renderiza a %1$d×%2$d completos</string>
+    <string name="setup_upscale_status">%1$s: 3D renderizado a %2$d×%3$d, reescalado a %4$d×%5$d</string>
+    <string name="setup_upscale_help">El campo de batalla se dibuja a menor resolución y Snapdragon GSR lo reescala nítido a pantalla completa: más FPS y la interfaz sigue nítida. Solo GLES y ANGLE. Se aplica en el próximo inicio.</string>
+    <string name="setup_toast_render_scale_saved">Guardado. Se aplicará la próxima vez que inicies el juego.</string>
+    <string name="setup_card_interface_scale">Tamaño de la interfaz</string>
+    <string name="setup_interface_scale_label">%1$d%%</string>
+    <string name="setup_button_apply_interface_scale">Aplicar tamaño de la interfaz</string>
+    <string name="setup_interface_scale_help">Agranda la interfaz del juego sin tocar sus archivos: la barra de control con el radar crece hacia arriba desde el borde inferior, y la barra de poderes del general, el chat, los mensajes de eventos, la lista de jugadores, el menú de partida con Guardar/Cargar y Opciones y los botones del menú principal crecen desde donde están. Nada sale de la pantalla: cada parte crece solo lo que cabe, así que en un teléfono ancho la barra de control se hace más alta en vez de más ancha, y el campo de batalla encima, más bajo. Funciona junto con el tamaño del texto del menú. Se aplica la próxima vez que inicies el juego.</string>
+
+    <!-- GeneralsX @feature Android port 04/10/2026 Tactical mod library. -->
+    <string name="mods_library_subtitle">Gestiona y ejecuta los mods instalados</string>
+    <string name="mods_library_title">Mods instalados</string>
+    <string name="mods_storage_used">Espacio usado</string>
+    <string name="mods_free_space">Espacio libre</string>
+    <string name="mods_size_unknown">No disponible</string>
+    <string name="mods_installed_badge">Instalado</string>
+    <string name="mods_launch_button">Iniciar</string>
+    <string name="mods_library_loading">Leyendo la biblioteca de mods…</string>
+    <string name="mods_library_empty">Aquí aparecerán los mods instalados. Importa una carpeta, un archivo BIG o un paquete ZIP.</string>
+    <string name="mods_brand_command" translatable="false">COMMAND &amp; CONQUER</string>
+    <string name="mods_brand_generals" translatable="false">GENERALS</string>
+    <string name="mods_brand_zero_hour" translatable="false">ZERO HOUR</string>
+
+    <!-- GeneralsX @feature Android port 04/10/2026 Tactical launcher presentation. -->
+    <string name="launcher_name" translatable="false">Generals Zero Hour</string>
+    <string name="launcher_ready">LISTO</string>
+    <string name="launcher_setup_needed">CONFIGURACIÓN NECESARIA</string>
+    <string name="launcher_quick_access">Acceso rápido</string>
+    <string name="launcher_game_data">Datos del juego</string>
+    <string name="launcher_engine_build">Versión del motor</string>
+    <string name="launcher_account">Cuenta</string>
+    <string name="launcher_play_now">Jugar ahora</string>
+    <string name="launcher_settings">Ajustes</string>
+    <string name="launcher_build_value">Compilación %1$d</string>
+    <string name="launcher_search_mods">Buscar mods</string>
+    <string name="launcher_no_matches">Ningún mod instalado coincide con tu búsqueda.</string>
+    <string name="launcher_signed_out">Sin sesión</string>
+    <string name="launcher_play_options">Opciones de juego</string>
+    <string name="launcher_mods_hint">Gestionar mods</string>
+    <string name="launcher_graphics_hint">Ajustes del juego</string>
+    <string name="launcher_data_hint">Configuración y archivos</string>
+    <string name="launcher_tools_hint">Registros y diagnóstico</string>
+    <string name="mods_delete_button">Eliminar</string>
+    <string name="mods_delete_confirm_title">¿Eliminar mod?</string>
+    <string name="mods_delete_confirm">¿Eliminar “%1$s” permanentemente de la carpeta Mods administrada?</string>
+    <string name="mods_delete_active_confirm">“%1$s” está activo. Al eliminarlo permanentemente se seleccionará Vanilla primero. ¿Continuar?</string>
+    <string name="mods_delete_success">Se eliminó %1$s.</string>
+    <string name="mods_delete_failed">No se pudo eliminar %1$s por completo. Comprueba el acceso al almacenamiento e inténtalo de nuevo.</string>
+    <string name="mods_import_cancel_action">Cancelar importación</string>
+    <string name="mods_import_cancelling">Cancelando de forma segura…</string>
+    <string name="mods_import_cancelled">Importación cancelada. Los mods instalados no cambiaron.</string>
+    <string name="setup_interface_scale_overlap_warning" formatted="false">Algunos mods sustituyen el diseño de la barra de control. Si sus elementos se superponen, prueba primero 100 %. El cambio se aplica al iniciar el juego de nuevo.</string>
+    <string name="setup_audio_check_ready">Se encontraron los archivos de audio necesarios. Si el juego sigue sin sonido, activa el registro de audio de abajo y reproduce el problema.</string>
+    <string name="setup_audio_check_missing">Faltan archivos de audio necesarios: %1$s</string>
+    <!-- GeneralsX @feature ChatGPT 10/10/2026 Engine transfer progress. -->
+    <string name="setup_updates_download_file">Descargando %1$s (%2$d de %3$d)</string>
+    <string name="setup_updates_received_total">Recibidos %1$s / %2$s</string>
+    <string name="setup_updates_received_unknown">Recibidos %1$s</string>
+    <string name="setup_updates_verify_file">Verificando %1$s…</string>
+    <string name="setup_updates_installing">Instalando actualización verificada del motor…</string>
+    <string name="setup_updates_retry">Reintentar</string>
+    <!-- GeneralsX @feature 10/10/2026 UI-only appearance settings. -->
+    <string name="setup_appearance_title">Apariencia</string>
+    <string name="setup_appearance_system">Sistema</string>
+    <string name="setup_appearance_light">Día</string>
+    <string name="setup_appearance_dark">Noche</string>
+    <string name="setup_appearance_help">Solo cambia la interfaz de la aplicación. Sistema sigue al teléfono; Día y Noche se guardan. Los gráficos del juego no cambian.</string>
+    <!-- Tactical Home illustrated update summary. -->
+    <string name="launcher_latest_updates">Últimas actualizaciones</string>
+    <string name="launcher_latest_updates_summary">Las versiones nuevas del motor llegan firmadas desde GitHub. Abre Actualizaciones para comprobarlas.</string>
+    <!-- Preserved Mod Health Check strings. -->
+    <string name="mods_details_button">Detalles</string>
+    <string name="mods_details_title">Detalles y revisión del mod</string>
+    <string name="mods_health_scanning">Revisando archivos instalados…</string>
+    <string name="mods_health_unavailable">No se puede revisar el mod con seguridad.</string>
+    <string name="mods_health_warning">Se encontraron problemas estructurales.</string>
+    <string name="mods_health_incomplete">Revisión incompleta; faltan archivos por comprobar.</string>
+    <string name="mods_health_no_big">No se encontraron archivos BIG.</string>
+    <string name="mods_health_structural_ok">Índices BIG revisados (no es prueba de juego).</string>
+    <string name="mods_health_big_count">Archivos BIG: %1$d</string>
+    <string name="mods_health_valid_count">BIG legibles: %1$d</string>
+    <string name="mods_health_invalid_count">BIG no válidos: %1$d</string>
+    <string name="mods_health_entry_count">Entradas BIG: %1$d</string>
+    <string name="mods_health_loose_count">Archivos sueltos: %1$d</string>
+    <string name="mods_health_nested_count">BIG anidados: %1$d</string>
+    <string name="mods_health_data_folder">Carpeta Data: %1$s</string>
+    <string name="mods_health_window_folder">Carpeta Window: %1$s</string>
+    <string name="mods_health_present">Presente</string>
+    <string name="mods_health_absent">No encontrada</string>
+    <string name="mods_health_fs_issues">Enlaces omitidos: %1$d · Elementos ilegibles: %2$d</string>
+    <string name="mods_health_nested_warning">Los BIG anidados pueden cargarse en otro orden.</string>
+    <string name="mods_health_invalid_files">Archivos BIG no válidos (hasta 8):</string>
+    <string name="mods_health_disclaimer">Solo se revisa la estructura, sin modificar archivos. No garantiza modelos, escudos, audio ni scripts dentro del juego.</string>
+    <string name="setup_card_controls">Controles</string>
+    <string name="setup_switch_mouse_mode">Ratón y panel táctil</string>
+    <string name="setup_switch_mouse_mode_desc">Un puntero en lugar de tocar donde quieres: un ratón conectado funciona como en PC y, sin él, tu dedo mueve el cursor como el panel táctil de un portátil. Desactivado: el juego se controla tocando directamente.</string>
+    <string name="setup_mouse_mode_help">Panel táctil: mueve un dedo para mover el cursor. Tocar = clic izquierdo, dos toques = doble clic, tocar y luego tocar y arrastrar = recuadro de selección. Tocar con dos dedos = clic derecho. Dos dedos = desplazar el mapa, pellizcar = zoom. Se aplica la próxima vez que inicie el juego. La opción del juego «Control alternativo del ratón» sigue decidiendo qué hacen los botones izquierdo y derecho. En los menús, la sala y los diálogos el dedo pulsa directamente, como siempre.</string>
+    <string name="setup_cursor_size_label">Tamaño del cursor: %1$d %%</string>
+    <string name="setup_switch_skip_intro">Omitir vídeos de introducción</string>
+    <string name="setup_switch_skip_intro_desc">Los logotipos de EA, la introducción y otros vídeos antes del menú se omiten; el juego carga directamente. Para ambos juegos, también con mods.</string>
 </resources>

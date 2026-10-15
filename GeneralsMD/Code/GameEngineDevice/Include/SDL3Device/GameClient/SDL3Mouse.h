@@ -33,6 +33,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 #include <array>
+#include <deque>
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
@@ -63,18 +64,18 @@ public:
 	virtual void setVisibility(Bool visible);
 	virtual void loseFocus();
 	virtual void regainFocus();
+	// GeneralsX @feature Codex 14/10/2026 Track the active input source, not just the OS.
+	Bool hasContinuousPointer() const override;
+	void getPointerClickToleranceScale(Real &x, Real &y) const;
+	Bool hasPhysicalPointer() const { return m_physicalPointer; }
+	void setPhysicalPointer(Bool active);
+	void cancelInput();
+	void suppressStream(Bool suppressed) { m_streamSuppressed = suppressed; }
+	static void scaleMouseCoordinates(int rawX, int rawY, Uint32 windowID, int& scaledX, int& scaledY);
 
 #if (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || defined(__ANDROID__)
-	// GeneralsX @feature Android port 01/08/2026 On touch-first platforms there
-	// is no real mouse hardware, and SDL3GameEngine.cpp's touch handler drives
-	// the message stream directly (MSG_RAW_MOUSE_* pushed straight onto
-	// TheMessageStream from real finger events). The base Mouse::
-	// createStreamMessages() unconditionally emits a MSG_RAW_MOUSE_POSITION
-	// every single frame from this object's own (never-updated-by-touch)
-	// m_currMouse.pos -- left enabled, that stale per-frame ping would fight
-	// the touch-driven position messages for GUI hover every frame. Override
-	// it to do nothing here; nothing on mobile calls addSDLEvent() on this
-	// object anymore, so there's no button/wheel state to flush either.
+	// GeneralsX @bugfix Codex 14/10/2026 A physical mouse gets the retail stream;
+	// touch owns its own gestures and must not leave a persistent pointer heartbeat.
 	virtual void createStreamMessages() override;
 
 	// GeneralsX @bugfix Android port 06/09/2026 Where the last finger touched.
@@ -93,6 +94,13 @@ public:
 	// map scrolling by itself from a point left near an edge. The position and the
 	// event are different things and only the first one is wanted here.
 	void setTouchCursorPos(Int x, Int y);
+
+	// GeneralsX @feature Android port 05/10/2026 Mouse and touchpad mode (GXMouseMode.h, issue #39).
+	// The touchpad gestures (SDL3GameEngine.cpp) are mouse events with this id, added with
+	// addSDLEvent() like a real mouse's. A real mouse is drawn by Android; a touchpad pointer is
+	// not, so the game draws it while the last pointer input came from the touchpad.
+	static const SDL_MouseID TOUCHPAD_MOUSE_ID = (SDL_MouseID)0xFFFFFFFDu;
+	virtual void draw() override;
 #endif
 
 	// SDL3-specific methods
@@ -111,13 +119,12 @@ protected:
 	virtual UnsignedByte getMouseEvent(MouseIO *result, Bool flush);
 
 private:
+	Bool m_physicalPointer = FALSE;
+	Bool m_streamSuppressed = FALSE;
+	Real m_wheelRemainder = 0;
 	// Event translation from SDL_Event (raw format)
 	// GeneralsX @refactor felipebraz 16/02/2026 Unified translation method
-	void translateEvent(UnsignedInt eventIndex, MouseIO *result);
-
-	// Scale raw SDL window coordinates to game internal resolution
-	// GeneralsX @bugfix felipebraz 20/02/2026 Port fighter19 coordinate scaling fix
-	static void scaleMouseCoordinates(int rawX, int rawY, Uint32 windowID, int& scaledX, int& scaledY);
+	void translateEvent(const SDL_Event &event, MouseIO *result);
 
 	// Load cursor from ANI file (fighter19 pattern)
 	// GeneralsX @bugfix BenderAI 22/02/2026 Port fighter19 cursor loading
@@ -128,14 +135,12 @@ private:
 	void translateButtonEvent(const SDL_MouseButtonEvent& event, MouseIO *result);
 	void translateWheelEvent(const SDL_MouseWheelEvent& event, MouseIO *result);
 
-	// SDL3 event buffer - Fighter19 pattern: raw SDL_Event array with sentinels
-	// GeneralsX @refactor felipebraz 16/02/2026 Use raw SDL_Event buffer like fighter19
-	// GeneralsX @bugfix felipebraz 18/02/2026 Increase to 256 to match Mouse::NUM_MOUSE_EVENTS
+	// GeneralsX @input Codex 14/10/2026 Preserve button edges even during a motion burst.
+	// Keep the previous device object layout; the non-lossy queue lives in the adapter implementation.
 	static const UnsignedInt MAX_SDL3_MOUSE_EVENTS = 256;
-	
 	SDL_Event m_eventBuffer[MAX_SDL3_MOUSE_EVENTS];
-	UnsignedInt m_nextFreeIndex;  // Write position (insert new events here)
-	UnsignedInt m_nextGetIndex;   // Read position (retrieve events from here)
+	UnsignedInt m_nextFreeIndex;
+	UnsignedInt m_nextGetIndex;
 
 	SDL_Window* m_Window;
 	Bool m_IsCaptured;
@@ -154,6 +159,10 @@ private:
 	
 	// GeneralsX @bugfix BenderAI 22/02/2026 Add cursor animation tracking
 	Int m_directionFrame;         ///< current frame of directional cursor (from 0 points up)
+
+	// GeneralsX @feature Android port 05/10/2026 The pointer was last moved by the touchpad, not a
+	// real mouse: draw() draws it. See TOUCHPAD_MOUSE_ID.
+	Bool m_touchpadPointer;
 };
 
 #endif // !_WIN32

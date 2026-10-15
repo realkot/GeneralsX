@@ -1,3 +1,4 @@
+#include "GXAndroidIdentity.h"
 /*
 **	Command & Conquer Generals Zero Hour(tm)
 **	Copyright 2025 Electronic Arts Inc.
@@ -40,7 +41,7 @@ inline bool GXLoggingDisabled()
 	{
 		char path[256];
 		const int userId = (int)(getuid() / 100000);
-		snprintf(path, sizeof(path), "/data/user/%d/com.generalsx.zerohour/files/logging_off", userId);
+		snprintf(path, sizeof(path), "/data/user/%d/" GX_ANDROID_APP_ID "/files/logging_off", userId);
 		state = (access(path, F_OK) == 0) ? 1 : 0;
 	}
 	return state == 1;

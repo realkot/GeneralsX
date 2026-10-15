@@ -625,10 +625,14 @@ void GameClient::update()
 	// We need to show the movie first.
 	if(TheGlobalData->m_playIntro && !TheDisplay->isMoviePlaying())
 	{
+#if !defined(__ANDROID__)
 		if(TheGameLODManager && TheGameLODManager->didMemPass())
 			TheDisplay->playLogoMovie("EALogoMovie", 5000, 3000);
 		else
 			TheDisplay->playLogoMovie("EALogoMovie640", 5000, 3000);
+#endif
+		// GeneralsX @tweak Codex 15/10/2026 Skip the EA startup logo on Android;
+		// retain the intro state transition and the separate sizzle/movie preferences.
 		TheWritableGlobalData->m_playIntro = FALSE;
 		TheWritableGlobalData->m_afterIntro = TRUE;
 		playSizzle = TRUE;

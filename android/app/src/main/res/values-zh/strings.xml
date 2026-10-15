@@ -257,6 +257,11 @@
     <string name="online_button_datapacks_delete">删除</string>
     <string name="online_switch_datapacks">使用社区数据补丁</string>
     <string name="online_switch_datapacks_desc">关闭后不会删除已下载的文件，但游戏会重新读取零售数据，电脑端主持的对局将拒绝本设备。下次启动游戏时生效。</string>
+    <string name="online_switch_datapacks_mods">有模组时也使用补丁</string>
+    <string name="online_switch_datapacks_mods_desc">默认情况下，如果游戏文件夹中有修改游戏数据的模组（如 Contra），则不加载补丁：两者的文件会混在一起。仅当模组是为 GeneralsOnline 补丁制作时才开启。</string>
+    <string name="online_datapacks_mod_found_skipped">发现模组：%1$s。不与其一起使用社区补丁。</string>
+    <string name="online_datapacks_mod_found_forced">发现模组：%1$s。与其一起使用社区补丁。</string>
+    <string name="online_datapacks_mod_none">游戏文件夹中没有修改游戏数据的模组。</string>
     <string name="online_datapacks_chip_sign_in_first">请先登录</string>
     <string name="online_datapacks_chip_required">联机所需 — 请点击“更新”</string>
     <string name="online_datapacks_chip_off">已下载，但已关闭</string>
@@ -322,4 +327,114 @@
     <string name="online_network_settings">网络设置（服务器、PC 兼容性）：%1$s 发布，自动从项目 GitHub 更新并已签名。</string>
     <string name="online_network_settings_builtin">网络设置（服务器、PC 兼容性）：内置于此版本；新设置会自动从项目 GitHub 获取。</string>
     <string name="online_datapacks_chip_update">有可用更新</string>
+    <string name="setup_card_upscale">超分辨率（Snapdragon GSR）</string>
+    <string name="setup_upscale_off_short">关</string>
+    <string name="setup_upscale_ultra_short">超级</string>
+    <string name="setup_upscale_quality_short">质量</string>
+    <string name="setup_upscale_balanced_short">平衡</string>
+    <string name="setup_upscale_performance_short">性能</string>
+    <string name="setup_upscale_ultra">超级质量</string>
+    <string name="setup_upscale_quality">质量</string>
+    <string name="setup_upscale_balanced">平衡</string>
+    <string name="setup_upscale_performance">性能</string>
+    <string name="setup_upscale_status_off">关闭：以完整 %1$d×%2$d 渲染</string>
+    <string name="setup_upscale_status">%1$s：3D 以 %2$d×%3$d 渲染，放大到 %4$d×%5$d</string>
+    <string name="setup_upscale_help">战场以较低分辨率渲染，再由 Snapdragon GSR 清晰放大到全屏：帧数更高，界面保持清晰。仅适用于 GLES 和 ANGLE。下次启动时生效。</string>
+    <string name="setup_toast_render_scale_saved">已保存。将在下次启动游戏时生效。</string>
+    <string name="setup_card_interface_scale">界面大小</string>
+    <string name="setup_interface_scale_label">%1$d%%</string>
+    <string name="setup_button_apply_interface_scale">应用界面大小</string>
+    <string name="setup_interface_scale_help">在不修改游戏文件的情况下放大游戏界面：带雷达的底部控制栏从屏幕底边向上增高，将军技能栏、聊天、事件消息、玩家列表、带保存/读取和选项的游戏菜单以及主菜单按钮从各自所在的位置放大。不会有任何内容超出屏幕：每个部分只放大到能容纳为止，因此在宽屏手机上控制栏会变高而不是变宽，上方的战场则相应变矮。可与“菜单文字大小”一起使用。将在下次启动游戏时生效。</string>
+
+    <!-- GeneralsX @feature Android port 04/10/2026 Tactical mod library. -->
+    <string name="mods_library_subtitle">管理和启动已安装的模组</string>
+    <string name="mods_library_title">已安装模组</string>
+    <string name="mods_storage_used">已用空间</string>
+    <string name="mods_free_space">可用空间</string>
+    <string name="mods_size_unknown">不可用</string>
+    <string name="mods_installed_badge">已安装</string>
+    <string name="mods_launch_button">启动</string>
+    <string name="mods_library_loading">正在读取模组库…</string>
+    <string name="mods_library_empty">已安装的模组将在此显示。导入文件夹、BIG 文件或 ZIP 包。</string>
+    <string name="mods_brand_command" translatable="false">COMMAND &amp; CONQUER</string>
+    <string name="mods_brand_generals" translatable="false">GENERALS</string>
+    <string name="mods_brand_zero_hour" translatable="false">ZERO HOUR</string>
+
+    <!-- GeneralsX @feature Android port 04/10/2026 Tactical launcher presentation. -->
+    <string name="launcher_name" translatable="false">Generals Zero Hour</string>
+    <string name="launcher_ready">已就绪</string>
+    <string name="launcher_setup_needed">需要设置</string>
+    <string name="launcher_quick_access">快捷入口</string>
+    <string name="launcher_game_data">游戏数据</string>
+    <string name="launcher_engine_build">引擎版本</string>
+    <string name="launcher_account">账户</string>
+    <string name="launcher_play_now">立即游玩</string>
+    <string name="launcher_settings">设置</string>
+    <string name="launcher_build_value">构建 %1$d</string>
+    <string name="launcher_search_mods">搜索模组</string>
+    <string name="launcher_no_matches">没有已安装的模组符合搜索条件。</string>
+    <string name="launcher_signed_out">未登录</string>
+    <string name="launcher_play_options">游玩选项</string>
+    <string name="launcher_mods_hint">管理已安装的模组</string>
+    <string name="launcher_graphics_hint">游戏设置</string>
+    <string name="launcher_data_hint">设置与文件</string>
+    <string name="launcher_tools_hint">日志与诊断</string>
+    <string name="mods_delete_button">删除</string>
+    <string name="mods_delete_confirm_title">删除模组？</string>
+    <string name="mods_delete_confirm">要从受管理的 Mods 文件夹中永久删除“%1$s”吗？</string>
+    <string name="mods_delete_active_confirm">“%1$s”当前已启用。永久删除前将先选择原版。继续吗？</string>
+    <string name="mods_delete_success">已删除 %1$s。</string>
+    <string name="mods_delete_failed">无法完全删除 %1$s。请检查存储访问权限后重试。</string>
+    <string name="mods_import_cancel_action">取消导入</string>
+    <string name="mods_import_cancelling">正在安全取消…</string>
+    <string name="mods_import_cancelled">导入已取消。已安装的模组未被更改。</string>
+    <string name="setup_interface_scale_overlap_warning" formatted="false">部分模组会替换控制栏布局。如果元素重叠，请先测试 100%。更改将在下次启动游戏时生效。</string>
+    <string name="setup_audio_check_ready">已找到所需音频档案。如果游戏仍然无声，请启用下方的音频日志并重现问题。</string>
+    <string name="setup_audio_check_missing">缺少所需音频档案：%1$s</string>
+    <!-- GeneralsX @feature ChatGPT 10/10/2026 Engine transfer progress. -->
+    <string name="setup_updates_download_file">正在下载 %1$s（%2$d/%3$d）</string>
+    <string name="setup_updates_received_total">已接收 %1$s / %2$s</string>
+    <string name="setup_updates_received_unknown">已接收 %1$s</string>
+    <string name="setup_updates_verify_file">正在验证 %1$s…</string>
+    <string name="setup_updates_installing">正在安装已验证的引擎更新…</string>
+    <string name="setup_updates_retry">重试</string>
+    <!-- GeneralsX @feature 10/10/2026 UI-only appearance settings. -->
+    <string name="setup_appearance_title">外观</string>
+    <string name="setup_appearance_system">跟随系统</string>
+    <string name="setup_appearance_light">日间</string>
+    <string name="setup_appearance_dark">夜间</string>
+    <string name="setup_appearance_help">只更改应用界面。跟随系统会使用手机设置；日间和夜间选择会保存。游戏画面不会改变。</string>
+    <!-- Tactical Home illustrated update summary. -->
+    <string name="launcher_latest_updates">最新更新</string>
+    <string name="launcher_latest_updates_summary">引擎更新由 GitHub 签名发布。打开“更新”查看或检查已安装版本。</string>
+    <!-- Preserved Mod Health Check strings. -->
+    <string name="mods_details_button">详情</string>
+    <string name="mods_details_title">模组详情与文件检查</string>
+    <string name="mods_health_scanning">正在检查已安装文件…</string>
+    <string name="mods_health_unavailable">无法安全检查此模组。</string>
+    <string name="mods_health_warning">发现文件结构问题。</string>
+    <string name="mods_health_incomplete">检查未完成。</string>
+    <string name="mods_health_no_big">未找到 BIG 文件。</string>
+    <string name="mods_health_structural_ok">BIG 索引检查通过（非游戏运行测试）。</string>
+    <string name="mods_health_big_count">BIG 文件：%1$d</string>
+    <string name="mods_health_valid_count">可读取 BIG：%1$d</string>
+    <string name="mods_health_invalid_count">无效 BIG：%1$d</string>
+    <string name="mods_health_entry_count">BIG 索引条目：%1$d</string>
+    <string name="mods_health_loose_count">独立文件：%1$d</string>
+    <string name="mods_health_nested_count">嵌套 BIG：%1$d</string>
+    <string name="mods_health_data_folder">Data 文件夹：%1$s</string>
+    <string name="mods_health_window_folder">Window 文件夹：%1$s</string>
+    <string name="mods_health_present">存在</string>
+    <string name="mods_health_absent">未找到</string>
+    <string name="mods_health_fs_issues">跳过链接：%1$d · 无法读取：%2$d</string>
+    <string name="mods_health_nested_warning">子目录中的 BIG 加载顺序可能不同。</string>
+    <string name="mods_health_invalid_files">无效 BIG 文件（最多 8 个）：</string>
+    <string name="mods_health_disclaimer">仅进行只读结构检查，不能确认游戏中的模型、护盾、音效或脚本是否正常工作。</string>
+    <string name="setup_card_controls">操控</string>
+    <string name="setup_switch_mouse_mode">鼠标和触控板</string>
+    <string name="setup_switch_mouse_mode_desc">使用指针代替点按：连接的鼠标与电脑上一样使用；没有鼠标时，手指像笔记本触控板一样移动光标。关闭：直接用触摸操控游戏。</string>
+    <string name="setup_mouse_mode_help">触控板：移动手指即可移动光标。轻点 = 左键单击，轻点两次 = 双击，轻点后再按住拖动 = 框选。双指轻点 = 右键单击。双指 = 滚动地图，捏合 = 缩放。下次启动游戏时生效。左右键的作用仍由游戏自己的“备用鼠标设置”选项决定。 在菜单、大厅和对话框中，手指照常直接点按。</string>
+    <string name="setup_cursor_size_label">光标大小：%1$d%%</string>
+    <string name="setup_switch_skip_intro">跳过开场动画</string>
+    <string name="setup_switch_skip_intro_desc">跳过 EA 标志、开场动画和菜单前的其他视频，游戏直接开始加载。适用于两款游戏，包括模组。</string>
 </resources>

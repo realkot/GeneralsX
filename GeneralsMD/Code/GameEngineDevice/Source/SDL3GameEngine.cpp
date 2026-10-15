@@ -43,6 +43,8 @@
 #include "WW3D2/dx8wrapper.h"
 #include "GameClient/View.h"
 #include "GameClient/Shell.h"
+#include "GameClient/WindowLayout.h"
+#include "Common/NameKeyGenerator.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Drawable.h"
 #include "W3DDevice/GameLogic/W3DGameLogic.h"
@@ -57,17 +59,23 @@
 #include "StdDevice/Common/StdBIGFileSystem.h"
 #include "Common/GlobalData.h"
 #include "GXTrace.h"
+#include "Common/GXMouseMode.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
+#include <cmath>
 
 #include "GameClient/LookAtXlat.h"
+#include "GameClient/SelectionXlat.h"
 #include "Common/AudioAffect.h"
 #include "Common/GameAudio.h"
 #include "GameLogic/GameLogic.h"
+#include "Common/FramePacer.h"
 #include "SDL3Device/GameClient/TouchInput.h"
+#include "SDL3Device/GameClient/AndroidTextEditor.h"
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
@@ -352,6 +360,7 @@ struct TouchState {
 	float lastX = 0.0f, lastY = 0.0f;   // finger1 latest position (pixels)
 	Uint64 downTicks = 0;
 	GameWindow *listBox = nullptr;      // list box under finger1 at touch-down, see LIST_SCROLL
+	Bool deferredPress = FALSE;         // UI_PRESS on a fire-on-down button: press sent at release
 
 	// GeneralsX @feature Android port 01/08/2026 Native touch camera control:
 	// pan/zoom go straight to TheTacticalView (userScrollBy/userZoom), driven
@@ -360,14 +369,25 @@ struct TouchState {
 	float panLastPxX = 0.0f, panLastPxY = 0.0f; // last processed finger1 pixel pos, single-finger PANNING
 
 	// GeneralsX @feature Android port 02/08/2026 Momentum (inertia): the
-	// pixel delta actually applied on the LAST processed PANNING frame,
-	// carried over as the coasting phase's starting velocity on release --
-	// see applyPendingCameraMotion()'s MOMENTUM branch.
+	// finger's velocity at release, in pixels per SECOND, carried over as the
+	// coasting phase's starting velocity -- see applyPendingCameraMotion()'s
+	// MOMENTUM branch.
 	float panVelX = 0.0f, panVelY = 0.0f;
 	// A virtual "finger" position that MOMENTUM advances by panVelX/Y each
 	// frame (screenToTerrain needs real screen coordinates to project, even
 	// though no finger is actually there anymore).
 	float momentumX = 0.0f, momentumY = 0.0f;
+	Uint64 momentumLastNs = 0;          // when MOMENTUM last advanced
+
+	// GeneralsX @bugfix Android port 28/09/2026 The finger's recent path while PANNING,
+	// as timestamped touch samples, so the release velocity comes from the finger rather
+	// than from the rendered frame -- see panReleaseVelocity().
+	static const int PAN_SAMPLES = 16;
+	float panSampleX[PAN_SAMPLES] = {};
+	float panSampleY[PAN_SAMPLES] = {};
+	Uint64 panSampleNs[PAN_SAMPLES] = {};
+	int panSampleCount = 0;             // valid samples, newest at index (panSampleNext - 1)
+	int panSampleNext = 0;
 
 	// TWOFINGER tracking: both fingers' current pixel positions (updated on
 	// every motion event), plus the last-processed centroid/spread so
@@ -434,9 +454,21 @@ const float TWO_FINGER_TAP_MAX_PX = 24.0f;
 // FRICTION is a per-frame multiplier (not per-second -- applyPendingCameraMotion
 // runs once per rendered frame, so this is frame-rate-dependent same as the
 // rest of this file's per-frame camera application).
-const float MOMENTUM_MIN_START_PX_PER_FRAME = 2.0f;  // below this release speed, don't bother coasting
-const float MOMENTUM_STOP_PX_PER_FRAME = 0.5f;       // below this, coasting has died down enough to stop
-const float MOMENTUM_FRICTION = 0.92f;               // velocity *= this, every frame, while coasting
+//
+// GeneralsX @bugfix Android port 28/09/2026 Reported on a 240 fps phone: the camera
+// sometimes stopped dead on release instead of coasting, depending on direction. All three
+// numbers were per rendered FRAME and the release speed was the finger's movement during
+// the last frame. At 240 fps the touch panel (120-240 Hz) delivers no sample in many
+// frames, so that last-frame delta was often exactly zero -- no coast at all -- or one
+// axis of it was, and when a coast did start, 0.92 per frame decayed four times faster in
+// wall time than at 60 fps. Everything is now per SECOND, with the values the 60 fps tuning
+// had (2 and 0.5 px/frame at 60 fps, 0.92 per 1/60 s), and the release speed is measured
+// over the finger's own timestamped samples (panReleaseVelocity).
+const float MOMENTUM_MIN_START_PX_PER_SEC = 120.0f;  // below this release speed, don't bother coasting
+const float MOMENTUM_STOP_PX_PER_SEC = 30.0f;        // below this, coasting has died down enough to stop
+const float MOMENTUM_FRICTION_PER_60TH = 0.92f;      // velocity *= this per 1/60 s while coasting
+const Uint64 PAN_VELOCITY_WINDOW_NS = 80000000;      // release speed: finger path over the last 80 ms
+const Uint64 PAN_REST_BEFORE_LIFT_NS = 100000000;    // no sample for 100 ms before lifting = finger stopped
 
 const float ZOOM_PX_PER_TICK = 40.0f; // calibration only -- see ZOOM_HEIGHT_PER_PIXEL below
 
@@ -574,11 +606,25 @@ void applyCameraPan(float fromPxX, float fromPxY, float toPxX, float toPxY)
 		GX_TRACE("applyCameraPan: blocked, the script owns the camera (cinematic)\n");
 		return;
 	}
+	// GeneralsX @bugfix Android port 28/09/2026 Sub-pixel steps. screenToTerrain() takes
+	// whole pixels, and at 240 fps a coast or a slow drag moves well under one pixel per
+	// frame: truncating both ends made most frames move nothing and every few frames jump a
+	// pixel. Project a stretched copy of the step instead (at least PAN_PROJECT_MIN_PX long,
+	// same direction) and scale the world delta back down -- the projection is locally
+	// linear over a few pixels, so this is the step's true size.
+	const float PAN_PROJECT_MIN_PX = 16.0f;
+	const float stepX = toPxX - fromPxX;
+	const float stepY = toPxY - fromPxY;
+	const float stepLen = SDL_max(SDL_fabsf(stepX), SDL_fabsf(stepY));
+	if (stepLen <= 0.0f) {
+		return;
+	}
+	const float stretch = (stepLen < PAN_PROJECT_MIN_PX) ? (PAN_PROJECT_MIN_PX / stepLen) : 1.0f;
 	ICoord2D fromScreen, toScreen;
-	fromScreen.x = (Int)fromPxX;
-	fromScreen.y = (Int)fromPxY;
-	toScreen.x = (Int)toPxX;
-	toScreen.y = (Int)toPxY;
+	fromScreen.x = (Int)SDL_lroundf(fromPxX);
+	fromScreen.y = (Int)SDL_lroundf(fromPxY);
+	toScreen.x = (Int)SDL_lroundf(fromPxX + stepX * stretch);
+	toScreen.y = (Int)SDL_lroundf(fromPxY + stepY * stretch);
 
 	Coord3D worldFrom, worldTo;
 	const Bool fromOk = TheTacticalView->screenToTerrain(&fromScreen, &worldFrom);
@@ -632,8 +678,8 @@ void applyCameraPan(float fromPxX, float fromPxY, float toPxX, float toPxY)
 	// confirmed, sufficient fix.
 
 	Coord3D pos = TheTacticalView->getPosition();
-	pos.x += (worldFrom.x - worldTo.x);
-	pos.y += (worldFrom.y - worldTo.y);
+	pos.x += (worldFrom.x - worldTo.x) / stretch;
+	pos.y += (worldFrom.y - worldTo.y) / stretch;
 	TheTacticalView->userSetPosition(pos);
 	TheTacticalView->forceRedraw();
 }
@@ -819,6 +865,58 @@ void pushMousePosition(float x, float y)
 //
 // Must come AFTER the button-up: the leave tail only runs while m_grabWindow is null, and
 // the up is what clears the grab.
+void resetPanSamples()
+{
+	s_touch.panSampleCount = 0;
+	s_touch.panSampleNext = 0;
+}
+
+void recordPanSample(float x, float y, Uint64 ns)
+{
+	const int i = s_touch.panSampleNext;
+	s_touch.panSampleX[i] = x;
+	s_touch.panSampleY[i] = y;
+	s_touch.panSampleNs[i] = ns;
+	s_touch.panSampleNext = (i + 1) % TouchState::PAN_SAMPLES;
+	if (s_touch.panSampleCount < TouchState::PAN_SAMPLES) {
+		++s_touch.panSampleCount;
+	}
+}
+
+// The finger's velocity at liftNs, in pixels per second: the straight line from the oldest
+// sample inside PAN_VELOCITY_WINDOW_NS to the newest one. Zero when the finger rested before
+// lifting -- a deliberate stop must stay a stop.
+void panReleaseVelocity(Uint64 liftNs, float &velX, float &velY)
+{
+	velX = velY = 0.0f;
+	if (s_touch.panSampleCount < 2) {
+		return;
+	}
+	const int n = TouchState::PAN_SAMPLES;
+	const int newest = (s_touch.panSampleNext - 1 + n) % n;
+	const Uint64 newestNs = s_touch.panSampleNs[newest];
+	if (liftNs > newestNs && liftNs - newestNs > PAN_REST_BEFORE_LIFT_NS) {
+		return;
+	}
+	int oldest = newest;
+	for (int k = 1; k < s_touch.panSampleCount; ++k) {
+		const int i = (newest - k + n) % n;
+		if (newestNs - s_touch.panSampleNs[i] > PAN_VELOCITY_WINDOW_NS) {
+			break;
+		}
+		oldest = i;
+	}
+	if (oldest == newest) {
+		return;
+	}
+	const float dt = (float)(newestNs - s_touch.panSampleNs[oldest]) * 1.0e-9f;
+	if (dt <= 0.0f) {
+		return;
+	}
+	velX = (s_touch.panSampleX[newest] - s_touch.panSampleX[oldest]) / dt;
+	velY = (s_touch.panSampleY[newest] - s_touch.panSampleY[oldest]) / dt;
+}
+
 void pushPointerGone()
 {
 	pushMousePosition(-1.0f, -1.0f);
@@ -836,6 +934,381 @@ void pushMouseButton(GameMessage::Type type, float x, float y)
 	if (touchDebugEnabled()) {
 		fprintf(stderr, "[gxtouch] send BUTTON type=%d at %d,%d\n", (int)type, (Int)x, (Int)y);
 	}
+}
+
+// GeneralsX @feature Android port 05/10/2026 Mouse and touchpad mode (GXMouseMode.h, issue #39).
+//
+// Chosen in the launcher, off by default. Then the game has a pointer, and a finger drives it the
+// way a laptop touchpad does instead of acting where it lands:
+//
+//   one finger moves         -> the pointer moves by the finger's motion (relative, x1.6)
+//   one-finger tap           -> left click where the pointer is; two taps -> double click
+//   tap, then touch and move -> left button held while moving (selection box, drag), released on lift
+//   two-finger tap           -> right click where the pointer is
+//   two fingers moving       -> the map follows them (applyCameraPan); pinch zooms (applyCameraZoom)
+//
+// Everything a finger does here is a mouse event -- SDL3Mouse::TOUCHPAD_MOUSE_ID, added to the
+// mouse's buffer exactly like a real mouse's -- so the game's own mouse handling answers it, the
+// same as on a PC. That is the opposite of the native touch layer above, and the reason it is a
+// separate mode: the lesson in docs/WORKDIR/lessons/LESSON-touch-input-is-not-a-mouse.md is that a
+// finger lacks what a pointer has (a position when nothing is pressed, hover, a place to rest near
+// an edge, singularity). Here there really is a pointer, with all of those: it stays where it was
+// left, it hovers, it can rest at an edge, and there is one of it.
+namespace
+{
+	struct TouchpadState
+	{
+		Bool havePointer = FALSE;
+		float pointerX = 0.0f, pointerY = 0.0f;	// window pixels
+		Int fingers = 0;
+		SDL_FingerID ids[2] = { 0, 0 };
+		float fx[2] = { 0, 0 }, fy[2] = { 0, 0 };	// window pixels
+		Int maxFingers = 0;
+		Uint64 downTicks = 0;
+		float travel = 0.0f;			// finger travel in this gesture, window pixels
+		float pendingDX = 0.0f, pendingDY = 0.0f;	// motion held back until it is clearly not a tap
+		Bool leftHeld = FALSE;
+		Bool dragArmed = FALSE;		// touched again right after a tap
+		Uint64 lastTapUpTicks = 0;
+		Bool direct = FALSE;		// this gesture presses where the finger is (a menu)
+		Bool panel = FALSE;		// this gesture presses the group panel, the pointer comes back after
+		float savedX = 0.0f, savedY = 0.0f;
+	};
+	TouchpadState s_pad;
+
+	const float PAD_SPEED = 1.6f;
+	const Uint64 PAD_TAP_MS = 250;
+	const Uint64 PAD_DOUBLE_TAP_MS = 300;
+
+	SDL3Mouse *padMouse()
+	{
+		return TheMouse ? dynamic_cast<SDL3Mouse *>(TheMouse) : nullptr;
+	}
+
+	// Window pixels to the game's own (the same mapping handleTouchEvent uses).
+	void padWindowToGame(SDL_Window *window, float wx, float wy, float &gx, float &gy)
+	{
+		gx = wx;
+		gy = wy;
+		int pbX = 0, pbY = 0, pbW = 0, pbH = 0;
+		int winW = 0, winH = 0;
+		SDL_GetWindowSize(window, &winW, &winH);
+		if (DX8Wrapper::Pillarbox_Get_Rect(pbX, pbY, pbW, pbH) && pbW > 0 && pbH > 0 && TheDisplay) {
+			gx = (wx - (float)pbX) * ((float)TheDisplay->getWidth() / (float)pbW);
+			gy = (wy - (float)pbY) * ((float)TheDisplay->getHeight() / (float)pbH);
+		} else if (TheDisplay && winW > 0 && winH > 0) {
+			gx = wx * (float)TheDisplay->getWidth() / (float)winW;
+			gy = wy * (float)TheDisplay->getHeight() / (float)winH;
+		}
+	}
+
+	void padSendMotion(SDL_Window *window, float dx, float dy)
+	{
+		SDL3Mouse *mouse = padMouse();
+		if (mouse == nullptr) {
+			return;
+		}
+		int winW = 0, winH = 0;
+		SDL_GetWindowSize(window, &winW, &winH);
+		s_pad.pointerX = std::min(std::max(s_pad.pointerX + dx, 0.0f), (float)(winW > 0 ? winW - 1 : 0));
+		s_pad.pointerY = std::min(std::max(s_pad.pointerY + dy, 0.0f), (float)(winH > 0 ? winH - 1 : 0));
+		SDL_Event e;
+		SDL_zero(e);
+		e.type = SDL_EVENT_MOUSE_MOTION;
+		e.motion.timestamp = SDL_GetTicksNS();
+		e.motion.windowID = SDL_GetWindowID(window);
+		e.motion.which = SDL3Mouse::TOUCHPAD_MOUSE_ID;
+		e.motion.state = s_pad.leftHeld ? SDL_BUTTON_LMASK : 0;
+		e.motion.x = s_pad.pointerX;
+		e.motion.y = s_pad.pointerY;
+		e.motion.xrel = dx;
+		e.motion.yrel = dy;
+		mouse->addSDLEvent(&e);
+	}
+
+	void padSendButton(SDL_Window *window, Uint8 button, bool down, Uint8 clicks)
+	{
+		SDL3Mouse *mouse = padMouse();
+		if (mouse == nullptr) {
+			return;
+		}
+		SDL_Event e;
+		SDL_zero(e);
+		e.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+		e.button.timestamp = SDL_GetTicksNS();
+		e.button.windowID = SDL_GetWindowID(window);
+		e.button.which = SDL3Mouse::TOUCHPAD_MOUSE_ID;
+		e.button.button = button;
+		e.button.down = down;
+		e.button.clicks = clicks;
+		e.button.x = s_pad.pointerX;
+		e.button.y = s_pad.pointerY;
+		mouse->addSDLEvent(&e);
+	}
+
+	void padClick(SDL_Window *window, Uint8 button, Uint8 clicks)
+	{
+		padSendButton(window, button, true, clicks);
+		padSendButton(window, button, false, clicks);
+	}
+
+	// GeneralsX @feature Android port 05/10/2026 Menus take the finger directly, as without this
+	// mode (owner's request): the main menu and its screens, the lobby, the in-game menu, options
+	// and any dialog. There the pointer jumps to the finger and the left button follows it, so a
+	// tap is a click where it lands and a drag moves a slider -- still mouse events, so the game
+	// sees one pointer. The battlefield and the control bar stay a touchpad.
+	Bool padMenuTakesFinger()
+	{
+		if (TheShell != nullptr && TheShell->isShellActive()) {
+			return TRUE;
+		}
+		if (TheInGameUI != nullptr && TheInGameUI->isQuitMenuVisible()) {
+			return TRUE;
+		}
+		if (TheShell != nullptr) {
+			WindowLayout *options = TheShell->getOptionsLayout(FALSE);
+			if (options != nullptr && !options->isHidden()) {
+				return TRUE;
+			}
+		}
+		return TheWindowManager != nullptr && TheWindowManager->winHasModal();
+	}
+
+	// GeneralsX @feature Android port 05/10/2026 The group panel ("=", "!", groups 0-9) takes the
+	// finger in touchpad mode too (owner: they could not be pressed by finger), and the pointer
+	// stays where it was: it jumps to the finger for the press and back when the finger lifts.
+	Bool padFingerOnGroupPanel(SDL_Window *window, float wx, float wy)
+	{
+		if (TheWindowManager == nullptr || TheNameKeyGenerator == nullptr) {
+			return FALSE;
+		}
+		float gx, gy;
+		padWindowToGame(window, wx, wy, gx, gy);
+		static NameKeyType s_panelRoot = NAMEKEY_INVALID;
+		if (s_panelRoot == NAMEKEY_INVALID) {
+			s_panelRoot = TheNameKeyGenerator->nameToKey("GroupPanel.wnd:GroupPanelParent");
+		}
+		for (GameWindow *w = TheWindowManager->getWindowUnderCursor((Int)gx, (Int)gy); w != nullptr; w = w->winGetParent()) {
+			if (w->winGetWindowId() == (Int)s_panelRoot) {
+				return TRUE;
+			}
+		}
+		return FALSE;
+	}
+
+	void padMoveTo(SDL_Window *window, float x, float y)
+	{
+		padSendMotion(window, x - s_pad.pointerX, y - s_pad.pointerY);
+	}
+
+	Int padFingerIndex(SDL_FingerID id)
+	{
+		for (Int i = 0; i < s_pad.fingers; ++i) {
+			if (s_pad.ids[i] == id) {
+				return i;
+			}
+		}
+		return -1;
+	}
+}
+
+// Returns TRUE when it clicked, with the pointer's position in game pixels in clickX/clickY: the
+// caller hands a text field under it the on-screen keyboard.
+Bool handleTouchpadEvent(SDL_Window *window, const SDL_Event &event, Int &clickX, Int &clickY)
+{
+	int winW = 0, winH = 0;
+	SDL_GetWindowSize(window, &winW, &winH);
+	if (winW <= 0 || winH <= 0) {
+		return FALSE;
+	}
+	if (!s_pad.havePointer) {
+		s_pad.pointerX = winW * 0.5f;
+		s_pad.pointerY = winH * 0.5f;
+		s_pad.havePointer = TRUE;
+		padSendMotion(window, 0.0f, 0.0f);
+	}
+
+	const float wx = event.tfinger.x * (float)winW;
+	const float wy = event.tfinger.y * (float)winH;
+	const float slop = winH * 0.012f;
+	const Uint64 now = SDL_GetTicks();
+	Bool clicked = FALSE;
+
+	switch (event.type) {
+	case SDL_EVENT_FINGER_DOWN:
+	{
+		if (s_pad.fingers >= 2) {
+			break;	// a third finger means nothing here
+		}
+		const Int i = s_pad.fingers++;
+		s_pad.ids[i] = event.tfinger.fingerID;
+		s_pad.fx[i] = wx;
+		s_pad.fy[i] = wy;
+		if (s_pad.fingers == 1) {
+			s_pad.panel = !padMenuTakesFinger() && padFingerOnGroupPanel(window, wx, wy);
+			if (s_pad.panel) {
+				s_pad.savedX = s_pad.pointerX;
+				s_pad.savedY = s_pad.pointerY;
+			}
+			s_pad.direct = s_pad.panel || padMenuTakesFinger();
+			if (s_pad.direct) {
+				padMoveTo(window, wx, wy);
+				padSendButton(window, SDL_BUTTON_LEFT, true, 1);
+				s_pad.leftHeld = TRUE;
+				break;
+			}
+			s_pad.maxFingers = 1;
+			s_pad.downTicks = now;
+			s_pad.travel = 0.0f;
+			s_pad.pendingDX = s_pad.pendingDY = 0.0f;
+			s_pad.dragArmed = (s_pad.lastTapUpTicks != 0 && now - s_pad.lastTapUpTicks < PAD_DOUBLE_TAP_MS);
+		} else if (s_pad.direct) {
+			break;	// a menu takes one finger
+		} else {
+			s_pad.maxFingers = 2;
+			if (s_pad.leftHeld) {
+				padSendButton(window, SDL_BUTTON_LEFT, false, 1);
+				s_pad.leftHeld = FALSE;
+			}
+		}
+		break;
+	}
+
+	case SDL_EVENT_FINGER_MOTION:
+	{
+		const Int i = padFingerIndex(event.tfinger.fingerID);
+		if (i < 0) {
+			break;
+		}
+		const float dx = wx - s_pad.fx[i];
+		const float dy = wy - s_pad.fy[i];
+
+		if (s_pad.direct) {
+			if (i == 0 && !s_pad.panel) {
+				s_pad.fx[0] = wx;
+				s_pad.fy[0] = wy;
+				padMoveTo(window, wx, wy);
+			}
+			break;
+		}
+
+		if (s_pad.maxFingers >= 2) {
+			if (s_pad.fingers == 2) {
+				// Two fingers: the map follows their centre, and their spread zooms.
+				const float oldCx = (s_pad.fx[0] + s_pad.fx[1]) * 0.5f;
+				const float oldCy = (s_pad.fy[0] + s_pad.fy[1]) * 0.5f;
+				const float oldDist = sqrtf((s_pad.fx[0] - s_pad.fx[1]) * (s_pad.fx[0] - s_pad.fx[1]) +
+				                            (s_pad.fy[0] - s_pad.fy[1]) * (s_pad.fy[0] - s_pad.fy[1]));
+				s_pad.fx[i] = wx;
+				s_pad.fy[i] = wy;
+				const float newCx = (s_pad.fx[0] + s_pad.fx[1]) * 0.5f;
+				const float newCy = (s_pad.fy[0] + s_pad.fy[1]) * 0.5f;
+				const float newDist = sqrtf((s_pad.fx[0] - s_pad.fx[1]) * (s_pad.fx[0] - s_pad.fx[1]) +
+				                            (s_pad.fy[0] - s_pad.fy[1]) * (s_pad.fy[0] - s_pad.fy[1]));
+				s_pad.travel += fabsf(newCx - oldCx) + fabsf(newCy - oldCy) + fabsf(newDist - oldDist);
+				if (s_pad.travel > slop * 2.0f) {
+					float gx0, gy0, gx1, gy1;
+					padWindowToGame(window, oldCx, oldCy, gx0, gy0);
+					padWindowToGame(window, newCx, newCy, gx1, gy1);
+					applyCameraPan(gx0, gy0, gx1, gy1);
+					float gd0x, gd0y, gd1x, gd1y;
+					padWindowToGame(window, oldDist, 0.0f, gd0x, gd0y);
+					padWindowToGame(window, newDist, 0.0f, gd1x, gd1y);
+					applyCameraZoom(gd1x - gd0x);
+				}
+			} else {
+				s_pad.fx[i] = wx;
+				s_pad.fy[i] = wy;	// one finger left over from a two-finger gesture moves nothing
+			}
+			break;
+		}
+
+		s_pad.fx[i] = wx;
+		s_pad.fy[i] = wy;
+		s_pad.travel += fabsf(dx) + fabsf(dy);
+		s_pad.pendingDX += dx * PAD_SPEED;
+		s_pad.pendingDY += dy * PAD_SPEED;
+		if (s_pad.travel <= slop) {
+			break;	// may still be a tap: do not jiggle the pointer
+		}
+		if (s_pad.dragArmed && !s_pad.leftHeld) {
+			padSendButton(window, SDL_BUTTON_LEFT, true, 1);
+			s_pad.leftHeld = TRUE;
+		}
+		padSendMotion(window, s_pad.pendingDX, s_pad.pendingDY);
+		s_pad.pendingDX = s_pad.pendingDY = 0.0f;
+		break;
+	}
+
+	case SDL_EVENT_FINGER_UP:
+	case SDL_EVENT_FINGER_CANCELED:
+	{
+		const Int i = padFingerIndex(event.tfinger.fingerID);
+		if (i < 0) {
+			break;
+		}
+		if (i == 0 && s_pad.fingers == 2) {
+			s_pad.ids[0] = s_pad.ids[1];
+			s_pad.fx[0] = s_pad.fx[1];
+			s_pad.fy[0] = s_pad.fy[1];
+		}
+		--s_pad.fingers;
+		if (s_pad.fingers > 0) {
+			break;
+		}
+
+		if (s_pad.direct) {
+			if (s_pad.leftHeld) {
+				padSendButton(window, SDL_BUTTON_LEFT, false, 1);
+				s_pad.leftHeld = FALSE;
+				clicked = (event.type != SDL_EVENT_FINGER_CANCELED);
+			}
+			if (s_pad.panel) {
+				padMoveTo(window, s_pad.savedX, s_pad.savedY);
+				s_pad.panel = FALSE;
+				clicked = FALSE;
+			}
+			s_pad.direct = FALSE;
+			s_pad.lastTapUpTicks = 0;
+			break;
+		}
+
+		const Bool canceled = (event.type == SDL_EVENT_FINGER_CANCELED);
+		const Bool quick = (now - s_pad.downTicks) < PAD_TAP_MS;
+		if (s_pad.leftHeld) {
+			padSendButton(window, SDL_BUTTON_LEFT, false, 1);
+			s_pad.leftHeld = FALSE;
+			s_pad.lastTapUpTicks = 0;
+		} else if (!canceled && s_pad.maxFingers >= 2) {
+			if (quick && s_pad.travel <= slop * 2.0f) {
+				padClick(window, SDL_BUTTON_RIGHT, 1);
+				clicked = TRUE;
+			}
+			s_pad.lastTapUpTicks = 0;
+		} else if (!canceled && quick && s_pad.travel <= slop) {
+			const Uint8 clicks = s_pad.dragArmed ? 2 : 1;
+			padClick(window, SDL_BUTTON_LEFT, clicks);
+			clicked = TRUE;
+			s_pad.lastTapUpTicks = (clicks == 1) ? now : 0;
+		} else {
+			s_pad.lastTapUpTicks = 0;
+		}
+		s_pad.maxFingers = 0;
+		s_pad.dragArmed = FALSE;
+		break;
+	}
+
+	default:
+		break;
+	}
+
+	if (clicked) {
+		float gx, gy;
+		padWindowToGame(window, s_pad.pointerX, s_pad.pointerY, gx, gy);
+		clickX = (Int)gx;
+		clickY = (Int)gy;
+	}
+	return clicked;
 }
 
 void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
@@ -869,6 +1342,13 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 		if (DX8Wrapper::Pillarbox_Get_Rect(pbX, pbY, pbW, pbH) && pbW > 0 && pbH > 0 && TheDisplay) {
 			px = (px - (float)pbX) * ((float)TheDisplay->getWidth() / (float)pbW);
 			py = (py - (float)pbY) * ((float)TheDisplay->getHeight() / (float)pbH);
+		} else if (TheDisplay && TheDisplay->getWidth() > 0 && TheDisplay->getHeight() > 0) {
+			// GeneralsX @feature Android port 01/10/2026 No pillarbox but a game resolution other
+			// than the window's: the GLES backend's virtual backbuffer stretches the whole game
+			// over the whole window (d3d8gles_SetVirtualBackbuffer), so the finger's share of the
+			// window is its share of the game. Identical to the window size when they match.
+			px = event.tfinger.x * (float)TheDisplay->getWidth();
+			py = event.tfinger.y * (float)TheDisplay->getHeight();
 		}
 	}
 
@@ -963,6 +1443,23 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 			GameWindow *uiHit = TheWindowManager
 				? TheWindowManager->getWindowUnderCursor((Int)px, (Int)py)
 				: nullptr;
+			// GeneralsX @bugfix Android port 28/09/2026 A DISABLED button is a UI press too.
+			// getWindowUnderCursor() does not descend into disabled windows, so on a command
+			// the player cannot use yet (missing prerequisite) or has already used (purchased
+			// upgrade) it returned the command panel behind it, this test said "not UI", and
+			// the touch went down the battlefield path -- the control bar was never told a
+			// finger was held there and could not keep the button's description up. Descend
+			// from the hit container, and from it only, with ignoreEnabled: a global
+			// ignoreEnabled hit test would also find disabled overlay windows such as the
+			// description popup itself. The press is still delivered as a mouse press, which
+			// the window manager routes by its own enabled-only hit test, so a disabled
+			// button stays unpressable exactly as with a mouse.
+			if (uiHit != nullptr && !isRealUiHit(uiHit)) {
+				GameWindow *disabledHit = uiHit->winPointInChild((Int)px, (Int)py, TRUE);
+				if (isRealUiHit(disabledHit) && !BitIsSet(disabledHit->winGetStatus(), WIN_STATUS_ENABLED)) {
+					uiHit = disabledHit;
+				}
+			}
 			if (isRealUiHit(uiHit)) {
 				s_touch.finger1 = event.tfinger.fingerID;
 				s_touch.phase = TouchState::UI_PRESS;
@@ -970,7 +1467,23 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 				s_touch.downY = s_touch.lastY = py;
 				s_touch.downTicks = SDL_GetTicks();
 				pushMousePosition(px, py);
-				pushMouseButton(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN, px, py);
+				// GeneralsX @bugfix Android port 28/09/2026 Reported: holding a command button
+				// to read its description bought the upgrade (or queued the unit) at once. The
+				// control bar's command buttons act on the DOWN (WIN_STATUS_ON_MOUSE_DOWN, set
+				// from the WND data), so no handling of the release could take it back. A finger
+				// cannot hover, so the hold is its only way to ask "what is this?" -- hold the
+				// press back for such a button and decide at release: a tap sends down and up
+				// together, a hold released while the description is up sends neither. The
+				// description does not need the press: ControlBar::update() follows the hold
+				// POINT (reportUiHold below), not the button's pressed state.
+				s_touch.deferredPress =
+					BitIsSet(uiHit->winGetStyle(), GWS_PUSH_BUTTON) &&
+					BitIsSet(uiHit->winGetStatus(), WIN_STATUS_ON_MOUSE_DOWN) &&
+					BitIsSet(uiHit->winGetStatus(), WIN_STATUS_ENABLED) &&
+					!BitIsSet(uiHit->winGetStatus(), WIN_STATUS_CHECK_LIKE);
+				if (!s_touch.deferredPress) {
+					pushMouseButton(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN, px, py);
+				}
 				// GeneralsX @feature Android port 06/09/2026 Tell the control bar a finger is
 				// down here, so it can keep the held button's description alive. It re-hit-tests
 				// this point every frame rather than trusting a window pointer or a widget state
@@ -1123,6 +1636,9 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 		if (event.tfinger.fingerID == s_touch.finger1) {
 			s_touch.lastX = px;
 			s_touch.lastY = py;
+			if (s_touch.phase == TouchState::PANNING) {
+				recordPanSample(px, py, event.tfinger.timestamp);
+			}
 			if (s_touch.phase == TouchState::TWOFINGER) {
 				s_touch.f1px = px;
 				s_touch.f1py = py;
@@ -1215,6 +1731,8 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 					s_touch.phase = TouchState::PANNING;
 					s_touch.panLastPxX = px;
 					s_touch.panLastPxY = py;
+					resetPanSamples();
+					recordPanSample(px, py, event.tfinger.timestamp);
 				}
 			}
 		}
@@ -1486,10 +2004,12 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 						// keeps calling applyCameraPan() with decaying velocity.
 						// No message stream involvement either way -- nothing to
 						// release.
+						panReleaseVelocity(event.tfinger.timestamp, s_touch.panVelX, s_touch.panVelY);
 						const float speed = SDL_fabsf(s_touch.panVelX) + SDL_fabsf(s_touch.panVelY);
-						if (speed >= MOMENTUM_MIN_START_PX_PER_FRAME) {
+						if (speed >= MOMENTUM_MIN_START_PX_PER_SEC) {
 							s_touch.momentumX = s_touch.lastX;
 							s_touch.momentumY = s_touch.lastY;
+							s_touch.momentumLastNs = SDL_GetTicksNS();
 							s_touch.phase = TouchState::MOMENTUM;
 							startedMomentum = true;
 						}
@@ -1523,6 +2043,8 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 							}
 							s_touch.finger2 = 0;
 							s_touch.phase = TouchState::PANNING;
+							resetPanSamples();
+							recordPanSample(s_touch.lastX, s_touch.lastY, event.tfinger.timestamp);
 							continueAsSinglePan = true;
 						}
 					}
@@ -1639,21 +2161,39 @@ void handleTouchEvent(SDL_Window *window, const SDL_Event &event)
 					// of natural tremor that used to cancel a hold gesture via
 					// GWM_MOUSE_LEAVING when this path went through PENDING's
 					// deferred classification instead.
+					//
+					// GeneralsX @bugfix Android port 28/09/2026 Reported: holding a button to
+					// read its description before buying still bought it. The hold has to keep
+					// the button pressed -- that is what the description poll watches -- so the
+					// release used to complete a click, and the old answer undid the INTENT
+					// afterwards (cancelOrDeselect): that could back out of a building placement
+					// but not out of a purchase or a queued unit, and with nothing armed it
+					// deselected the builder instead. Undo the MECHANICS: a long hold released
+					// while the description is up takes the press back before the up, exactly as
+					// a mouse sliding off the button does, so the button never fires. A tap, or
+					// a hold released before the description appeared, still acts.
+					//
+					// A fire-on-down button (see the finger-down case) got no press yet: the
+					// tap is sent whole here, unless the hold was a read or the OS took the
+					// touch away.
+					const Bool readHold = (SDL_GetTicks() - s_touch.downTicks) >= LONG_PRESS_MS &&
+						TouchInput::isDescriptionShown();
 					pushMousePosition(s_touch.downX, s_touch.downY);
-					pushMouseButton(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP, s_touch.downX, s_touch.downY);
+					if (s_touch.deferredPress) {
+						if (!readHold && event.type != SDL_EVENT_FINGER_CANCELED) {
+							pushMouseButton(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN, s_touch.downX, s_touch.downY);
+							pushMouseButton(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP, s_touch.downX, s_touch.downY);
+						}
+					} else {
+						if (readHold) {
+							TouchInput::withdrawReadButtonPress();
+						}
+						pushMouseButton(GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP, s_touch.downX, s_touch.downY);
+					}
+					s_touch.deferredPress = FALSE;
 
 					pushPointerGone();
 					TouchInput::reportUiHold(0, 0, FALSE);
-					// GeneralsX @bugfix Android port 06/09/2026 Reported: holding a build
-					// button to read its description eventually enters build mode and the
-					// description disappears. The hold has to keep the button pressed -- that
-					// is what the description poll watches (WIN_STATE_SELECTED) -- so the
-					// release necessarily completes a click. Undo the intent rather than the
-					// mechanics: a press held this long was to read, not to arm, so back out
-					// of whatever it armed. A short tap is unaffected and still builds.
-					if ((SDL_GetTicks() - s_touch.downTicks) >= LONG_PRESS_MS) {
-						TouchInput::cancelOrDeselect();
-					}
 					break;
 				}
 				default:
@@ -1810,7 +2350,29 @@ void publishTouchDebug()
 void enforceNoPointerScrollWithoutFinger()
 {
 #if defined(__ANDROID__) || (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
+	SDL3Mouse *mouse = dynamic_cast<SDL3Mouse *>(TheMouse);
+	if (mouse && mouse->hasPhysicalPointer()) return;
 	if (TheLookAtTranslator == nullptr) {
+		return;
+	}
+	// GeneralsX @bugfix Android port 05/10/2026 Not with a pointer chosen (GXMouseMode.h): then
+	// there IS a pointer with no finger down, it rests at the edge, and this cancelled every edge
+	// scroll the moment it started (owner's report, twice). The touch state machine is not even
+	// running in that mode, so its phase says nothing.
+	//
+	// GeneralsX @bugfix Android port 05/10/2026 ...but the right-button drag scroll still needs it
+	// there (owner: "some finger combination switches on held-right-button mode and I fly over the
+	// whole map"). The touchpad never holds the right button -- a two-finger tap is a right click,
+	// down and up at once -- yet a right button-up that a translator before LookAtTranslator keeps
+	// for itself (a click on the interface, an order cancelled) leaves SCROLL_RMB latched, and from
+	// then on every pointer move scrolls the camera away from the anchor. With no real right button
+	// down (SDL's own mouse state; the touchpad's events never enter it) it cannot be legitimate.
+	if (GXMouseModeEnabled()) {
+		if (TheLookAtTranslator->isRightButtonScrollActive() &&
+		    (SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_RMASK) == 0) {
+			fprintf(stderr, "[gxtouch] cancelling a right-button scroll with no right button down\n");
+			TheLookAtTranslator->cancelScrolling();
+		}
 		return;
 	}
 	const Bool noFinger = (s_touch.phase == TouchState::IDLE || s_touch.phase == TouchState::MOMENTUM);
@@ -1889,8 +2451,6 @@ void applyPendingCameraMotion()
 	updateTouchTargetFeedback();
 
 	if (s_touch.phase == TouchState::PANNING) {
-		s_touch.panVelX = s_touch.lastX - s_touch.panLastPxX;
-		s_touch.panVelY = s_touch.lastY - s_touch.panLastPxY;
 		applyCameraPan(s_touch.panLastPxX, s_touch.panLastPxY, s_touch.lastX, s_touch.lastY);
 		s_touch.panLastPxX = s_touch.lastX;
 		s_touch.panLastPxY = s_touch.lastY;
@@ -1945,15 +2505,25 @@ void applyPendingCameraMotion()
 		// "finger" (momentumX/Y) that applyCameraPan()'s screenToTerrain
 		// projection still needs real screen coordinates for -- no actual
 		// finger is down during this phase.
-		const float newX = s_touch.momentumX + s_touch.panVelX;
-		const float newY = s_touch.momentumY + s_touch.panVelY;
+		// Advanced by elapsed time, not by frame, so the coast covers the same distance
+		// over the same time at 30, 60 or 240 fps. A long stall (a loading hitch) is
+		// clamped rather than applied as one jump.
+		const Uint64 nowNs = SDL_GetTicksNS();
+		float dt = (float)(nowNs - s_touch.momentumLastNs) * 1.0e-9f;
+		s_touch.momentumLastNs = nowNs;
+		if (dt > 0.05f) {
+			dt = 0.05f;
+		}
+		const float newX = s_touch.momentumX + s_touch.panVelX * dt;
+		const float newY = s_touch.momentumY + s_touch.panVelY * dt;
 		applyCameraPan(s_touch.momentumX, s_touch.momentumY, newX, newY);
 		s_touch.momentumX = newX;
 		s_touch.momentumY = newY;
-		s_touch.panVelX *= MOMENTUM_FRICTION;
-		s_touch.panVelY *= MOMENTUM_FRICTION;
+		const float friction = SDL_powf(MOMENTUM_FRICTION_PER_60TH, dt * 60.0f);
+		s_touch.panVelX *= friction;
+		s_touch.panVelY *= friction;
 		const float speed = SDL_fabsf(s_touch.panVelX) + SDL_fabsf(s_touch.panVelY);
-		if (speed < MOMENTUM_STOP_PX_PER_FRAME) {
+		if (speed < MOMENTUM_STOP_PX_PER_SEC) {
 			s_touch.phase = TouchState::IDLE;
 		}
 	}
@@ -1963,6 +2533,136 @@ void applyPendingCameraMotion()
 #endif // SAGE_MOBILE_PLATFORM
 
 namespace {
+
+// GeneralsX @feature Codex 14/10/2026 Cancel ownership without emitting a click or order.
+#if defined(SAGE_MOBILE_PLATFORM)
+static Bool s_middlePan = FALSE;
+static float s_middleX = 0, s_middleY = 0;
+static SDL_MouseButtonFlags s_physicalButtons = 0;
+static Bool s_cancelAfterFrame = FALSE;
+
+void cancelPointerGesture()
+{
+    GadgetListBoxTouchScrollEnd();
+    TouchInput::reportUiHold(0, 0, FALSE);
+    if (s_touch.phase == TouchState::PLACING && TheInGameUI)
+        TheInGameUI->placeBuildAvailable(nullptr, nullptr);
+    s_touch = TouchState();
+    s_middlePan = FALSE;
+    if (TheLookAtTranslator) {
+        TheLookAtTranslator->cancelScrolling();
+        TheLookAtTranslator->resetModes();
+    }
+    if (TheSelectionTranslator) {
+        TheSelectionTranslator->setDragSelecting(FALSE);
+        TheSelectionTranslator->setLeftMouseButton(FALSE);
+    }
+    if (TheInGameUI) {
+        TheInGameUI->setSelecting(FALSE);
+        TheInGameUI->clearTouchAimPoint();
+    }
+    if (TheTacticalView) TheTacticalView->setMouseLock(FALSE);
+    if (TheWindowManager) {
+        GameWindow *grab = TheWindowManager->winGetGrabWindow();
+        if (grab) TheWindowManager->winSendInputMsg(grab, GWM_MOUSE_LEAVING, 0, 0);
+        TheWindowManager->winSetGrabWindow(nullptr);
+        GameWindow *capture = TheWindowManager->winGetCapture();
+        if (capture) TheWindowManager->winRelease(capture);
+    }
+    SDL3Mouse *mouse = dynamic_cast<SDL3Mouse *>(TheMouse);
+    if (mouse) mouse->cancelInput();
+}
+
+void cancelMobileInput()
+{
+    s_pad = TouchpadState();
+    s_physicalButtons = 0;
+#if defined(__ANDROID__)
+    AndroidTextEditor::close();
+#endif
+    cancelPointerGesture();
+    SDL3Mouse *mouse = dynamic_cast<SDL3Mouse *>(TheMouse);
+    if (mouse) mouse->setPhysicalPointer(FALSE);
+    if (TheKeyboard) TheKeyboard->reset();
+    if (TheInGameUI) {
+        TheInGameUI->setForceAttackMode(FALSE);
+        TheInGameUI->setForceMoveMode(FALSE);
+        TheInGameUI->setWaypointMode(FALSE);
+    }
+}
+
+// MMB is consumed here on Android only. Other buttons continue through the retail translators.
+Bool handlePhysicalMouse(SDL_Event &event, SDL_Window *window)
+{
+    SDL3Mouse *mouse = dynamic_cast<SDL3Mouse *>(TheMouse);
+    if (!mouse) return TRUE;
+    const SDL_MouseID source = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.which :
+        event.type == SDL_EVENT_MOUSE_WHEEL ? event.wheel.which : event.button.which;
+    if (source == SDL_TOUCH_MOUSEID) return TRUE;
+    // A held gesture retains ownership until release. Do not interleave a mouse
+    // press with the touch down/up already queued for this frame.
+    if (s_touch.phase != TouchState::IDLE && s_touch.phase != TouchState::MOMENTUM) return TRUE;
+    if (s_pad.fingers > 0) return TRUE;
+    if (!mouse->hasPhysicalPointer()) {
+        cancelPointerGesture();
+        mouse->setPhysicalPointer(TRUE);
+    }
+#if defined(__ANDROID__)
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+        s_physicalButtons |= SDL_BUTTON_MASK(event.button.button);
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+        s_physicalButtons &= ~SDL_BUTTON_MASK(event.button.button);
+    int w = 0, h = 0;
+    SDL_GetWindowSize(window, &w, &h);
+    if (!TheDisplay || w <= 0 || h <= 0) return TRUE;
+    const float rawX = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x :
+        event.type == SDL_EVENT_MOUSE_WHEEL ? event.wheel.mouse_x : event.button.x;
+    const float rawY = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.y :
+        event.type == SDL_EVENT_MOUSE_WHEEL ? event.wheel.mouse_y : event.button.y;
+    Int gameX, gameY;
+    SDL3Mouse::scaleMouseCoordinates((Int)rawX, (Int)rawY, SDL_GetWindowID(window), gameX, gameY);
+    const float x = (float)gameX, y = (float)gameY;
+    if ((event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+        && event.button.button == SDL_BUTTON_MIDDLE) {
+        const Bool down = event.button.down;
+        cancelPointerGesture();
+        s_middlePan = down && !touchPointBelongsToUi(x, y)
+            && TheGameLogic && TheGameLogic->isInInteractiveGame()
+            && !TheGameLogic->isGamePaused() && !gxScriptOwnsCamera();
+        s_middleX = x;
+        s_middleY = y;
+        if (TheLookAtTranslator) TheLookAtTranslator->cancelScrolling();
+        mouse->suppressStream(s_middlePan);
+        SDL_CaptureMouse(s_middlePan != FALSE);
+        if (!down) {
+            mouse->setPosition((Int)x, (Int)y);
+            const SDL_MouseButtonEvent button = event.button;
+            event = SDL_Event();
+            event.type = SDL_EVENT_MOUSE_MOTION;
+            event.motion.type = SDL_EVENT_MOUSE_MOTION;
+            event.motion.windowID = button.windowID;
+            event.motion.timestamp = button.timestamp;
+            event.motion.which = button.which;
+            event.motion.x = button.x;
+            event.motion.y = button.y;
+            return FALSE;
+        }
+        return TRUE;
+    }
+    if (s_middlePan) {
+        if (TheLookAtTranslator) TheLookAtTranslator->cancelScrolling();
+        if (event.type == SDL_EVENT_MOUSE_MOTION) {
+            if (TheGameLogic && !TheGameLogic->isGamePaused())
+                applyCameraPan(s_middleX, s_middleY, x, y);
+            s_middleX = x;
+            s_middleY = y;
+        }
+        return TRUE;
+    }
+#endif
+    return FALSE;
+}
+#endif
 
 Bool DecodeNextUtf8Codepoint(const char* text, size_t length, size_t& offset, UnsignedInt& outCodepoint)
 {
@@ -2150,6 +2850,10 @@ void SDL3GameEngine::update(void)
 	s_wasPausedLastFrame = pausedNow;
 #endif
 	GameEngine::update();
+#if defined(SAGE_MOBILE_PLATFORM)
+    // GeneralsX @bugfix Codex 14/10/2026 Clear downs translated after OS cancellation.
+    if (s_cancelAfterFrame) { cancelMobileInput(); s_cancelAfterFrame = FALSE; }
+#endif
 }
 
 /**
@@ -2229,6 +2933,10 @@ void SDL3GameEngine::pollSDL3Events(void)
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
+#if defined(SAGE_MOBILE_PLATFORM)
+                cancelMobileInput();
+                s_cancelAfterFrame = TRUE;
+#endif
 				m_IsActive = false;
 				if (m_IsTextInputActive) {
 					SDL_StopTextInput(m_SDLWindow);
@@ -2244,6 +2952,8 @@ void SDL3GameEngine::pollSDL3Events(void)
 			// App suspension/resume: mirror the desktop focus handling so audio
 			// and mouse state pause cleanly (the render gate lives in update()).
 			case SDL_EVENT_DID_ENTER_BACKGROUND:
+                cancelMobileInput();
+                s_cancelAfterFrame = TRUE;
 				m_IsActive = false;
 				if (TheMouse) {
 					TheMouse->loseFocus();
@@ -2282,7 +2992,18 @@ void SDL3GameEngine::pollSDL3Events(void)
 				break;
 #endif
 
-			case SDL_EVENT_WINDOW_MOUSE_ENTER:
+#if defined(SAGE_MOBILE_PLATFORM)
+            case SDL_EVENT_KEYBOARD_ADDED:
+                m_TextInputFocusWindow = nullptr;
+                break;
+            case SDL_EVENT_MOUSE_REMOVED:
+            case SDL_EVENT_KEYBOARD_REMOVED:
+                cancelMobileInput();
+                s_cancelAfterFrame = TRUE;
+                m_TextInputFocusWindow = nullptr;
+                break;
+#endif
+            case SDL_EVENT_WINDOW_MOUSE_ENTER:
 				if (TheMouse) {
 					TheMouse->onCursorMovedInside();
 				}
@@ -2296,6 +3017,9 @@ void SDL3GameEngine::pollSDL3Events(void)
 
 			case SDL_EVENT_KEY_DOWN:
 			case SDL_EVENT_KEY_UP:
+#if defined(SAGE_MOBILE_PLATFORM)
+                if (!m_IsActive || s_cancelAfterFrame) break;
+#endif
 				// GeneralsX @bugfix Android port 27/09/2026 Enter never finished a text entry under
 				// SDL. On Windows the Return key reaches a focused entry as the character VK_RETURN
 				// (WM_CHAR), and that is the only thing GadgetTextEntryInput takes as "done" -- its
@@ -2311,6 +3035,7 @@ void SDL3GameEngine::pollSDL3Events(void)
 					const WideChar returnCharacter = 0x0D; // VK_RETURN, which GadgetTextEntryInput compares against
 					TheWindowManager->winSendInputMsg(m_TextInputFocusWindow, GWM_IME_CHAR,
 						static_cast<WindowMsgData>(returnCharacter), 0);
+                    break;
 				}
 				// Fighter19 pattern: direct addSDLEvent() call
 				// GeneralsX @refactor felipebraz 16/02/2026 Simplified event routing
@@ -2331,6 +3056,7 @@ void SDL3GameEngine::pollSDL3Events(void)
 			case SDL_EVENT_MOUSE_BUTTON_UP:
 			case SDL_EVENT_MOUSE_WHEEL:
 #if defined(SAGE_MOBILE_PLATFORM)
+                if (!m_IsActive || s_cancelAfterFrame) break;
 				// Belt-and-braces: drop SDL's own touch-synthesized mouse events.
 				// handleTouchEvent() owns all touch input (pushing GameMessages
 				// directly, see its file-header comment) and SDL3Mouse never
@@ -2338,7 +3064,7 @@ void SDL3GameEngine::pollSDL3Events(void)
 				// synthesize its own mouse-shaped events from a touch if the
 				// SDL_HINT_TOUCH_MOUSE_EVENTS hint didn't take for some reason;
 				// drop them so they can't sneak a phantom click in some other way.
-				if (event.motion.which == SDL_TOUCH_MOUSEID) {
+				if (handlePhysicalMouse(event, m_SDLWindow)) {
 					break;
 				}
 #endif
@@ -2357,7 +3083,18 @@ void SDL3GameEngine::pollSDL3Events(void)
 			case SDL_EVENT_FINGER_MOTION:
 			case SDL_EVENT_FINGER_UP:
 			case SDL_EVENT_FINGER_CANCELED:
-				// GeneralsX @bugfix Android port 11/07/2026 - A fresh touch-down or a
+                if (!m_IsActive || s_cancelAfterFrame) break;
+                // Real touch owns gestures until real mouse input takes over again.
+                if (event.tfinger.touchID == SDL_MOUSE_TOUCHID) break;
+                if (s_physicalButtons || s_middlePan) break;
+                if (SDL3Mouse *mouse = dynamic_cast<SDL3Mouse *>(TheMouse)) {
+                    if (mouse->hasPhysicalPointer()) {
+                        if (event.type != SDL_EVENT_FINGER_DOWN) break;
+                        cancelPointerGesture();
+                        mouse->setPhysicalPointer(FALSE);
+                    }
+                }
+                // GeneralsX @bugfix Android port 11/07/2026 - A fresh touch-down or a
 				// touch-up (the clean-tap case dispatches its synthetic click on UP, see
 				// handleTouchEvent()) is a candidate to (re)open the on-screen keyboard.
 				// Set on both since the eventual entry-field focus change is processed a
@@ -2371,11 +3108,36 @@ void SDL3GameEngine::pollSDL3Events(void)
 				// a map, a dropdown or empty space all summoned the on-screen
 				// keyboard again, over and over, with no way to keep it down.
 				// Dismissing it and tapping anything brought it straight back.
+				// GeneralsX @feature Android port 05/10/2026 With a pointer chosen in the launcher a
+				// finger is a touchpad (handleTouchpadEvent), and the native touch layer stays out.
+				if (GXMouseModeEnabled()) {
+                    if (s_physicalButtons || s_middlePan) break;
+                    SDL3Mouse *physical = dynamic_cast<SDL3Mouse *>(TheMouse);
+                    if (event.type == SDL_EVENT_FINGER_DOWN && physical && physical->hasPhysicalPointer()) {
+                        cancelPointerGesture(); physical->setPhysicalPointer(FALSE);
+                    }
+					Int clickX = 0, clickY = 0;
+					if (m_SDLWindow && handleTouchpadEvent(m_SDLWindow, event, clickX, clickY)) {
+						GameWindow* clicked = TheWindowManager ? TheWindowManager->getWindowUnderCursor(clickX, clickY) : nullptr;
+						if (clicked != nullptr && BitIsSet(clicked->winGetStyle(), GWS_ENTRY_FIELD)) {
+							m_PendingTextInputRearmFrames = 20;
+						}
+					}
+					break;
+				}
 				if (event.type == SDL_EVENT_FINGER_DOWN || event.type == SDL_EVENT_FINGER_UP) {
 					int winW = 0;
 					int winH = 0;
 					if (m_SDLWindow) {
 						SDL_GetWindowSize(m_SDLWindow, &winW, &winH);
+					}
+					// GeneralsX @bugfix Android port 01/10/2026 Hit-tested in the game's resolution,
+					// which differs from the window's when rendering below it (see handleTouchEvent).
+					int pbX = 0, pbY = 0, pbW = 0, pbH = 0;
+					if (TheDisplay && TheDisplay->getWidth() > 0 && TheDisplay->getHeight() > 0 &&
+					    !DX8Wrapper::Pillarbox_Get_Rect(pbX, pbY, pbW, pbH)) {
+						winW = TheDisplay->getWidth();
+						winH = TheDisplay->getHeight();
 					}
 
 					GameWindow* touched = (TheWindowManager && winW > 0 && winH > 0)
@@ -2407,6 +3169,11 @@ void SDL3GameEngine::pollSDL3Events(void)
 		updateTextInputState();
 	}
 
+#if defined(__ANDROID__)
+	// Whatever the EditText bar sent since the last frame, applied on this thread.
+	AndroidTextEditor::pump();
+#endif
+
 #if defined(SAGE_MOBILE_PLATFORM)
 	// Once per frame, after every queued SDL touch event for this frame has
 	// been drained -- see applyPendingCameraMotion()'s comment for why this
@@ -2424,9 +3191,12 @@ void SDL3GameEngine::updateTextInputState(void)
 
 	GameWindow* focusedWindow = TheWindowManager->winGetFocus();
 	const Bool wantsTextInput =
-		focusedWindow != nullptr && BitIsSet(focusedWindow->winGetStyle(), GWS_ENTRY_FIELD);
+		m_IsActive && focusedWindow != nullptr && BitIsSet(focusedWindow->winGetStyle(), GWS_ENTRY_FIELD);
 
 	if (!wantsTextInput) {
+#if defined(__ANDROID__)
+        AndroidTextEditor::close();
+#endif
 		if (m_IsTextInputActive) {
 			SDL_StopTextInput(m_SDLWindow);
 			m_IsTextInputActive = false;
@@ -2435,7 +3205,25 @@ void SDL3GameEngine::updateTextInputState(void)
 		return;
 	}
 
+    const Bool newTextFocus = m_TextInputFocusWindow != focusedWindow;
 	m_TextInputFocusWindow = focusedWindow;
+#if defined(__ANDROID__)
+    // GeneralsX @feature Codex 14/10/2026 Port the upstream editor; hardware focus opens it too.
+    // Source: MYSOREZ/GeneralsZH-Android-Port, 576e2265bf271176028d1cef4f2b3fe8caa20b34.
+    // https://github.com/MYSOREZ/GeneralsZH-Android-Port
+    const Bool retarget = AndroidTextEditor::field() && AndroidTextEditor::field() != focusedWindow;
+    if (m_IsActive && (m_PendingTextInputRearmFrames > 0 || retarget || (newTextFocus && SDL_HasKeyboard()))) {
+        if (AndroidTextEditor::open(focusedWindow)) {
+            if (TheKeyboard) TheKeyboard->reset();
+            if (TheLookAtTranslator) TheLookAtTranslator->cancelScrolling();
+            SDL_StopTextInput(m_SDLWindow);
+            m_IsTextInputActive = false;
+            m_PendingTextInputRearmFrames = 0;
+            return;
+        }
+    }
+    if (AndroidTextEditor::field()) return;
+#endif
 
 #if defined(SAGE_MOBILE_PLATFORM)
 	// GeneralsX @bugfix Android port 11/07/2026 - Only (re)open the on-screen keyboard
@@ -2448,6 +3236,17 @@ void SDL3GameEngine::updateTextInputState(void)
 	// itself several times in a row on real devices. Gating the resync to only run
 	// inside this once-per-tap block fixes both: no auto-open, and no self-induced
 	// flicker.
+    if (SDL_HasKeyboard()) {
+        SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "auto");
+        if (!m_IsTextInputActive) {
+            SDL_PropertiesID props = SDL_CreateProperties();
+            SDL_SetBooleanProperty(props, SDL_PROP_TEXTINPUT_MULTILINE_BOOLEAN, false);
+            m_IsTextInputActive = SDL_StartTextInputWithProperties(m_SDLWindow, props);
+            SDL_DestroyProperties(props);
+        }
+        m_PendingTextInputRearmFrames = 0;
+        return;
+    }
 	if (m_PendingTextInputRearmFrames > 0) {
 		if (m_IsTextInputActive && !SDL_ScreenKeyboardShown(m_SDLWindow)) {
 			// OS dismissed it since the last tap without us being told -- resync

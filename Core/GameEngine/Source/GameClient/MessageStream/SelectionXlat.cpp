@@ -413,6 +413,8 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 		// Note that the raw left messages are only used to draw feedback now when
 		// appropriate. All actual selection code takes place in
 		// MSG_MOUSE_LEFT_CLICK & MSG_MOUSE_LEFT_DOUBLE_CLICK
+		// GeneralsX @bugfix Codex 15/10/2026 A raw double-click is a fresh press too.
+		case GameMessage::MSG_RAW_MOUSE_LEFT_DOUBLE_CLICK:
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN:
 		{
 			disp = onRawMouseLeftButtonDown(msg);
@@ -426,6 +428,7 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			disp = onRawMouseLeftButtonUp(msg);
 			break;
 		}
+		case GameMessage::MSG_RAW_MOUSE_RIGHT_DOUBLE_CLICK:
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN:
 		{
 			disp = onRawMouseRightButtonDown(msg);
@@ -556,7 +559,7 @@ GameMessageDisposition SelectionTranslator::onRawMousePosition(MAYBE_UNUSED cons
 		delta.y = abs(pixel.y - m_leftMouseDownAnchor.y);
 
 		// if mouse has moved while left button is down, begin drag selection
-		if (delta.x > TheMouse->m_dragTolerance || delta.y > TheMouse->m_dragTolerance)
+		if (!TheMouse->isClickDistance(delta))
 		{
 			if (m_dragSelecting == false)
 			{

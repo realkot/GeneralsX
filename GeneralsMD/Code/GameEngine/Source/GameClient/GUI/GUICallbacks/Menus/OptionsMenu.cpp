@@ -47,6 +47,9 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/LookAtXlat.h"
 #include "GameClient/WindowLayout.h"
+#include "GameClient/GXUiScale.h"
+#include "GameClient/GameFont.h"
+#include "GameClient/Color.h"
 #include "GameClient/Gadget.h"
 #include "GameClient/GadgetCheckBox.h"
 #include "GameClient/GadgetStaticText.h"
@@ -928,6 +931,7 @@ static void saveOptions()
 }
 
 static void DestroyOptionsLayout() {
+	CloseExtrasMenu();
 
 	SignalUIInteraction(SHELL_SCRIPT_HOOK_OPTIONS_CLOSED);
 
@@ -964,6 +968,11 @@ static void initLabelVersion()
 		if (TheVersion && TheGlobalData)
 		{
 			UnicodeString text = TheVersion->getUnicodeProductVersionHashString();
+#ifdef __ANDROID__
+			// GeneralsX @tweak Codex 15/10/2026 Replace only Options' credit prefix.
+			text.format(L"GeneralsX [mod by realkot] | exe:%08X ini:%08X %ls",
+				TheGlobalData->m_exeCRC, TheGlobalData->m_iniCRC, TheVersion->getUnicodeVersion().str());
+#endif
 			GadgetStaticTextSetText( labelVersion, text );
 		}
 		else
@@ -976,6 +985,41 @@ static void initLabelVersion()
 //-------------------------------------------------------------------------------------------------
 /** Initialize the options menu */
 //-------------------------------------------------------------------------------------------------
+// GeneralsX @ui Codex 14/10/2026 Free space beside the heading, transformed with the Options layout.
+static void gxEnsureExtrasButton()
+{
+    const NameKeyType id = TheNameKeyGenerator->nameToKey("OptionsMenu.wnd:ButtonExtras");
+    if (TheWindowManager->winGetWindowFromId(nullptr, id)) return;
+    GameWindow *back = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey("OptionsMenu.wnd:ButtonBack"));
+    if (!back || !back->winGetParent() || !TheDisplay) return;
+    GameWindow *parent = back->winGetParent();
+    Int px, py; parent->winGetScreenPosition(&px, &py);
+    const auto &transform = GXUiScale::forLayout("Menus/OptionsMenu.wnd");
+    const Int left = (Int)transform.mapX(TheDisplay->getWidth() * 510.0f / 800.0f);
+    const Int right = (Int)transform.mapX(TheDisplay->getWidth() * 642.0f / 800.0f);
+    const Int top = (Int)transform.mapY(TheDisplay->getHeight() * 22.0f / 600.0f);
+    const Int bottom = (Int)transform.mapY(TheDisplay->getHeight() * 54.0f / 600.0f);
+    WinInstanceData inst;
+    inst.init(); inst.m_style = GWS_PUSH_BUTTON | GWS_MOUSE_TRACK;
+    inst.m_textLabelString = "Extras";
+    inst.m_enabledText.color = inst.m_hiliteText.color = GameMakeColor(255, 220, 120, 255);
+    inst.m_disabledText.color = GameMakeColor(130, 130, 130, 255);
+    for (Int i=0; i<MAX_DRAW_DATA; ++i) {
+        inst.m_enabledDrawData[i].color = GameMakeColor(16, 28, 40, 240);
+        inst.m_enabledDrawData[i].borderColor = GameMakeColor(195, 165, 90, 255);
+        inst.m_hiliteDrawData[i] = inst.m_enabledDrawData[i];
+        inst.m_disabledDrawData[i] = inst.m_enabledDrawData[i];
+    }
+    // GeneralsX @bugfix Codex 15/10/2026 Reuse the stock Options font; avoid live font-size changes.
+    GameFont *font = back->winGetInstanceData()->getFont();
+    GameWindow *button = TheWindowManager->gogoGadgetPushButton(parent, WIN_STATUS_ENABLED,
+        left-px, top-py, right-left, bottom-top, &inst, font, FALSE);
+    if (button) {
+        button->winSetWindowId(id);
+        GadgetButtonSetText(button, UnicodeString(L"Extras"));
+    }
+}
+
 void OptionsMenuInit( WindowLayout *layout, void *userData )
 {
 	ignoreSelected = TRUE;
@@ -1462,6 +1506,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	}
 
 
+	gxEnsureExtrasButton();
 	TheWindowManager->winSetModal(parent);
 	ignoreSelected = FALSE;
 }
@@ -1576,30 +1621,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			buttonAccept = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:ButtonAccept" );
 			buttonKeyboardOptionsMenu = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:ButtonKeyboardOptions" );
 
-			// GeneralsX @feature fbraz3 08/06/2026 Create Extras button dynamically
-			// (OptionsMenu.wnd in WindowZH.big has no ButtonExtras, so we add it at runtime)
-			{
-				GameWindow *backBtn = TheWindowManager->winGetWindowFromId(window, buttonBack);
-				if (backBtn) {
-					WinInstanceData instData;
-					instData.init();
-					BitSet(instData.m_style, GWS_PUSH_BUTTON | GWS_MOUSE_TRACK);
-					instData.m_textLabelString = "Extras";
-
-					GameWindow *extrasBtn = TheWindowManager->gogoGadgetPushButton(
-						backBtn->winGetParent(),
-						WIN_STATUS_ENABLED | WIN_STATUS_IMAGE,
-						320, 528,
-						145, 32,
-						&instData, nullptr, TRUE);
-
-					if (extrasBtn) {
-						buttonExtrasMenu = TheNameKeyGenerator->nameToKey("OptionsMenu.wnd:ButtonExtras");
-						extrasBtn->winSetWindowId(buttonExtrasMenu);
-						extrasBtn->winSetSystemFunc(OptionsMenuSystem);
-					}
-				}
-			}
+			buttonExtrasMenu = TheNameKeyGenerator->nameToKey("OptionsMenu.wnd:ButtonExtras");
 
 			break;
 
@@ -1608,6 +1630,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 		//---------------------------------------------------------------------------------------------
 		case GWM_DESTROY:
 		{
+			CloseExtrasMenu();
 
 			break;
 
@@ -1721,7 +1744,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if ( controlID == buttonExtrasMenu )
 			{
-				TheShell->push( "Menus/ExtrasMenu.wnd" );
+				OpenExtrasMenu(pref);
 			}
 			else if(controlID == checkDrawAnchorID )
       {

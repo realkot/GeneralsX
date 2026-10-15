@@ -891,14 +891,17 @@ Bool OptionPreferences::getShowMoneyPerMinute() const
 Real OptionPreferences::getMaxCameraHeight() const
 {
 	OptionPreferences::const_iterator it = find("MaxCameraHeight");
-	if (it == end())
-		return TheGlobalData->m_maxCameraHeight;
-
-	Real val = (Real)atof(it->second.str());
+	Real val = it == end() ? TheGlobalData->m_maxCameraHeight : (Real)atof(it->second.str());
 	if (val < 100.0f)
 		val = 100.0f;
+#ifdef __ANDROID__
+	// GeneralsX @tweak Codex 15/10/2026 Clamp old saved preferences to the 3600/4 ceiling.
+	if (val > 900.0f)
+		val = 900.0f;
+#else
 	if (val > 1000.0f)
 		val = 1000.0f;
+#endif
 	return val;
 }
 

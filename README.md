@@ -1,3 +1,9 @@
+> **GeneralsX [mod by realkot] — Android test r9**
+>
+> [Download the tested APK](apk/GeneralsZH-InputTest-20261015-r9.apk?raw=true) · [Detailed Russian changelog](CHANGELOG_RU.md) · [Validation and limitations](docs/WORKDIR/reports/ANDROID_INPUT_TEST_R9.md)
+>
+> Based on [koreazolfakar-droid](https://github.com/koreazolfakar-droid/GeneralsZH-Android-Port) with selected changes from the [MYSOREZ](https://github.com/MYSOREZ/GeneralsZH-Android-Port) lineage. Includes tablet mouse/keyboard controls, army selectors, a right-aligned HD control panel and camera/Extras improvements. The broad r8 upscale and additional renderer/AI experiments were reverted; only the six HD control-panel atlases remain. Package: `com.generalsx.zerohour.inputtest`. Original game data must be supplied separately. Existing upstream documentation below describes the parent project and may differ from this test build.
+
 # Command & Conquer Generals: Zero Hour — Android
 
 > **This is an unofficial, community-made fan port.** It is not affiliated

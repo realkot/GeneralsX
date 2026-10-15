@@ -42,6 +42,13 @@
 #include "GameClient/KeyDefs.h"
 #include "GameClient/WindowLayout.h"
 #include "GameClient/Display.h"
+#include "GameClient/View.h"
+#include "GameClient/Color.h"
+#include "GameClient/GameFont.h"
+#include "GameClient/GadgetStaticText.h"
+#include "GameLogic/GameLogic.h"
+#include <cstdlib>
+#include <cstring>
 
 // Widget IDs and pointers
 static NameKeyType sliderMaxCameraHeightID = NAMEKEY_INVALID;
@@ -58,9 +65,69 @@ static GameWindow *sliderDrawDistance = nullptr;
 
 static OptionPreferences *pref = nullptr;
 
+// GeneralsX @extras Codex 14/10/2026 Keep the Options modal and paused game beneath this popup.
+static WindowLayout *s_extrasLayout = nullptr;
+static OptionPreferences *s_optionsPreferences = nullptr;
+#if defined(__ANDROID__)
+static const Int GX_EXTRA_CAMERA_SCALE = 4;
+#else
+static const Int GX_EXTRA_CAMERA_SCALE = 1;
+#endif
+
+static void gxExtrasBackdropDraw(GameWindow *window, WinInstanceData *data)
+{
+    // GeneralsX @feature Codex 15/10/2026 Opaque stock Options palette and section rules.
+    if (!TheDisplay) return;
+    const Int w = TheDisplay->getWidth(), h = TheDisplay->getHeight();
+    TheDisplay->drawFillRect(0, 0, w, h, GameMakeColor(0, 0, 0, 255));
+    const UnsignedInt blue = GameMakeColor(65, 65, 190, 255);
+    TheDisplay->drawOpenRect(w/10, h/20, w*8/10, h*17/20, 1.0f, blue);
+    TheDisplay->drawLine(w/10, h*95/600, w*9/10, h*95/600, 1.0f, blue);
+    TheDisplay->drawLine(w/10, h*425/600, w*9/10, h*425/600, 1.0f, blue);
+}
+
+void CloseExtrasMenu()
+{
+    WindowLayout *layout = s_extrasLayout;
+    s_extrasLayout = nullptr;
+    s_optionsPreferences = nullptr;
+    if (!layout) return;
+    GameWindow *parent = TheWindowManager->winGetWindowFromId(nullptr,
+        TheNameKeyGenerator->nameToKey("ExtrasMenu.wnd:ExtrasMenuParent"));
+    if (parent) TheWindowManager->winUnsetModal(parent);
+    layout->runShutdown(nullptr);
+    layout->destroyWindows();
+    deleteInstance(layout);
+    GameWindow *options = TheWindowManager->winGetWindowFromId(nullptr,
+        TheNameKeyGenerator->nameToKey("OptionsMenu.wnd:OptionsMenuParent"));
+    if (options) TheWindowManager->winSetFocus(options);
+}
+
+void OpenExtrasMenu(OptionPreferences *optionsPreferences)
+{
+    if (s_extrasLayout || !TheWindowManager) return;
+    WindowLayout *layout = TheWindowManager->winCreateLayout("ExtrasMenu.wnd");
+    if (!layout) {
+        fprintf(stderr, "[GX-EXTRAS] missing layout; Options remains usable\n");
+        return;
+    }
+    GameWindow *parent = TheWindowManager->winGetWindowFromId(nullptr,
+        TheNameKeyGenerator->nameToKey("ExtrasMenu.wnd:ExtrasMenuParent"));
+    if (!parent) { layout->destroyWindows(); deleteInstance(layout); return; }
+    s_extrasLayout = layout;
+    s_optionsPreferences = optionsPreferences;
+    parent->winSetDrawFunc(gxExtrasBackdropDraw);
+    layout->runInit(nullptr);
+    layout->hide(FALSE);
+    layout->bringForward();
+    TheWindowManager->winSetModal(parent);
+    TheWindowManager->winSetFocus(parent);
+}
+
 // Slider ranges (matching .wnd definitions)
-static const Int SLIDER_MAX_CAMERA_HEIGHT_MIN = 100;
-static const Int SLIDER_MAX_CAMERA_HEIGHT_MAX = 1000;
+static const Int SLIDER_MAX_CAMERA_HEIGHT_MIN = 100 * GX_EXTRA_CAMERA_SCALE;
+// GeneralsX @tweak Codex 15/10/2026 900 stored units correspond to manual height 3600.
+static const Int SLIDER_MAX_CAMERA_HEIGHT_MAX = 900 * GX_EXTRA_CAMERA_SCALE;
 static const Int SLIDER_MIN_CAMERA_HEIGHT_MIN = 50;
 static const Int SLIDER_MIN_CAMERA_HEIGHT_MAX = 300;
 static const Int SLIDER_CAMERA_PITCH_MIN = 20;
@@ -73,6 +140,7 @@ static const Int SLIDER_DRAW_DISTANCE_MAX = 200;
 //-------------------------------------------------------------------------------------------------
 void ExtrasMenuInit(WindowLayout *layout, void *userData)
 {
+	fprintf(stderr, "[GX-EXTRAS] initialize popup\n");
 	sliderMaxCameraHeightID = TheNameKeyGenerator->nameToKey("ExtrasMenu.wnd:SliderMaxCameraHeight");
 	sliderMinCameraHeightID = TheNameKeyGenerator->nameToKey("ExtrasMenu.wnd:SliderMinCameraHeight");
 	sliderCameraPitchID = TheNameKeyGenerator->nameToKey("ExtrasMenu.wnd:SliderCameraPitch");
@@ -89,7 +157,7 @@ void ExtrasMenuInit(WindowLayout *layout, void *userData)
 
 	// Populate sliders from current settings
 	if (sliderMaxCameraHeight) {
-		Int val = (Int)pref->getMaxCameraHeight();
+		Int val = (Int)(pref->getMaxCameraHeight() * GX_EXTRA_CAMERA_SCALE);
 		GadgetSliderSetPosition(sliderMaxCameraHeight, val);
 	}
 	if (sliderMinCameraHeight) {
@@ -108,6 +176,30 @@ void ExtrasMenuInit(WindowLayout *layout, void *userData)
 		Int val = (Int)(pref->getTerrainDrawDistanceScale() * 100.0f);
 		GadgetSliderSetPosition(sliderDrawDistance, val);
 	}
+    // GeneralsX @ui Codex 14/10/2026 Literal labels and fonts remain readable with high render resolution.
+    const char *language = getenv("GENERALSX_TEXT_LANGUAGE");
+    const Bool russian = language && strcmp(language, "russian") == 0;
+    const char *names[] = {"LabelTitle", "LabelMaxCameraHeight", "LabelMinCameraHeight", "LabelCameraPitch", "LabelScrollSpeed", "LabelDrawDistance"};
+    const wchar_t *english[] = {L"EXTRA OPTIONS", L"Maximum camera height", L"Minimum camera height", L"Camera pitch", L"Scroll speed", L"Terrain draw distance"};
+    const wchar_t *ru[] = {L"ДОПОЛНИТЕЛЬНЫЕ НАСТРОЙКИ", L"Максимальная высота камеры", L"Минимальная высота камеры", L"Наклон камеры", L"Скорость прокрутки", L"Дальность отрисовки"};
+    for (Int i=0; i<6; ++i) {
+        AsciiString id; id.format("ExtrasMenu.wnd:%s", names[i]);
+        GameWindow *label = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(id));
+        if (label) {
+            GadgetStaticTextSetText(label, UnicodeString(russian ? ru[i] : english[i]));
+        }
+    }
+    const char *buttons[] = {"ButtonBack", "ButtonDefaults", "ButtonAccept"};
+    const wchar_t *enButtons[] = {L"Cancel", L"Defaults", L"Apply"};
+    const wchar_t *ruButtons[] = {L"Отмена", L"По умолчанию", L"Применить"};
+    for (Int i=0; i<3; ++i) {
+        AsciiString id; id.format("ExtrasMenu.wnd:%s", buttons[i]);
+        GameWindow *button = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey(id));
+        if (button) {
+            GadgetButtonSetText(button, UnicodeString(russian ? ruButtons[i] : enButtons[i]));
+        }
+    }
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -133,12 +225,13 @@ void ExtrasMenuShutdown(WindowLayout *layout, void *userData)
 //-------------------------------------------------------------------------------------------------
 static void saveExtras()
 {
-	if (!pref)
-		return;
+	if (!pref || !TheWritableGlobalData || !sliderMaxCameraHeight || !sliderMinCameraHeight
+        || !sliderCameraPitch || !sliderScrollSpeed || !sliderDrawDistance) return;
 
 	Int val;
 
-	val = GadgetSliderGetPosition(sliderMaxCameraHeight);
+	val = max(SLIDER_MAX_CAMERA_HEIGHT_MIN, min(SLIDER_MAX_CAMERA_HEIGHT_MAX, GadgetSliderGetPosition(sliderMaxCameraHeight))) / GX_EXTRA_CAMERA_SCALE;
+    val = max(val, max(SLIDER_MIN_CAMERA_HEIGHT_MIN, min(SLIDER_MIN_CAMERA_HEIGHT_MAX, GadgetSliderGetPosition(sliderMinCameraHeight))));
 	if (val > 0) {
 		TheWritableGlobalData->m_maxCameraHeight = (Real)val;
 		AsciiString prefString;
@@ -146,7 +239,7 @@ static void saveExtras()
 		(*pref)["MaxCameraHeight"] = prefString;
 	}
 
-	val = GadgetSliderGetPosition(sliderMinCameraHeight);
+	val = max(SLIDER_MIN_CAMERA_HEIGHT_MIN, min(SLIDER_MIN_CAMERA_HEIGHT_MAX, GadgetSliderGetPosition(sliderMinCameraHeight)));
 	if (val > 0) {
 		TheWritableGlobalData->m_minCameraHeight = (Real)val;
 		AsciiString prefString;
@@ -154,7 +247,7 @@ static void saveExtras()
 		(*pref)["MinCameraHeight"] = prefString;
 	}
 
-	val = GadgetSliderGetPosition(sliderCameraPitch);
+	val = max(SLIDER_CAMERA_PITCH_MIN, min(SLIDER_CAMERA_PITCH_MAX, GadgetSliderGetPosition(sliderCameraPitch)));
 	if (val > 0) {
 		TheWritableGlobalData->m_cameraPitch = (Real)val;
 		AsciiString prefString;
@@ -162,7 +255,7 @@ static void saveExtras()
 		(*pref)["CameraPitch"] = prefString;
 	}
 
-	val = GadgetSliderGetPosition(sliderScrollSpeed);
+	val = max(SLIDER_SCROLL_SPEED_MIN, min(SLIDER_SCROLL_SPEED_MAX, GadgetSliderGetPosition(sliderScrollSpeed)));
 	if (val > 0) {
 		TheWritableGlobalData->m_keyboardScrollFactor = val / 100.0f;
 		AsciiString prefString;
@@ -170,20 +263,31 @@ static void saveExtras()
 		(*pref)["ScrollFactor"] = prefString;
 	}
 
-	val = GadgetSliderGetPosition(sliderDrawDistance);
+	val = max(SLIDER_DRAW_DISTANCE_MIN, min(SLIDER_DRAW_DISTANCE_MAX, GadgetSliderGetPosition(sliderDrawDistance)));
 	if (val > 0) {
 		TheWritableGlobalData->m_terrainDrawDistanceScale = val / 100.0f;
 		AsciiString prefString;
 		prefString.format("%d", val);
 		(*pref)["TerrainDrawDistanceScale"] = prefString;
 	}
+    if (s_optionsPreferences) {
+        const char *keys[] = {"MaxCameraHeight", "MinCameraHeight", "CameraPitch", "ScrollFactor", "TerrainDrawDistanceScale"};
+        for (const char *key : keys) (*s_optionsPreferences)[key] = (*pref)[key];
+    }
+    if (TheTacticalView) {
+        TheTacticalView->setCameraHeightAboveGroundLimitsToDefault();
+        if (TheGameLogic && TheGameLogic->isInInteractiveGame() && !TheTacticalView->isDoingScriptedCamera()) {
+            TheTacticalView->setPitch(DEG_TO_RADF(TheWritableGlobalData->m_cameraPitch));
+        }
+    }
+
 }
 
 //-------------------------------------------------------------------------------------------------
 static void setDefaults()
 {
 	if (sliderMaxCameraHeight)
-		GadgetSliderSetPosition(sliderMaxCameraHeight, 500);
+		GadgetSliderSetPosition(sliderMaxCameraHeight, 500 * GX_EXTRA_CAMERA_SCALE);
 	if (sliderMinCameraHeight)
 		GadgetSliderSetPosition(sliderMinCameraHeight, 80);
 	if (sliderCameraPitch)
@@ -228,14 +332,14 @@ WindowMsgHandledType ExtrasMenuSystem(GameWindow *window, UnsignedInt msg,
 			Int controlID = control->winGetWindowId();
 
 			if (controlID == buttonBack) {
-				TheShell->pop();
+				CloseExtrasMenu();
 			}
 			else if (controlID == buttonAccept) {
 				saveExtras();
 				if (pref) {
 					pref->write();
 				}
-				TheShell->pop();
+				CloseExtrasMenu();
 			}
 			else if (controlID == buttonDefaults) {
 				setDefaults();
@@ -266,7 +370,7 @@ WindowMsgHandledType ExtrasMenuInput(GameWindow *window, UnsignedInt msg,
 				case KEY_ESC:
 				{
 					if (BitIsSet(state, KEY_STATE_UP)) {
-						TheShell->pop();
+						CloseExtrasMenu();
 					}
 					return MSG_HANDLED;
 				}

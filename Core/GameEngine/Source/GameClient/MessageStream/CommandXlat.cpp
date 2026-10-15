@@ -986,6 +986,49 @@ static Object *iNeedAHero()
 /**
  * Create DO_MOVE_TO messages for each selected object, instructing it to move to the given location.
  */
+// GeneralsX @diagnostics Codex 15/10/2026 Opt-in click tracing; no motion logging or protocol changes.
+static Bool gxMouseOrderTraceEnabled()
+{
+    static const Bool enabled = []() -> Bool {
+        FILE *file = fopen("gx_input_trace.txt", "r");
+        if (!file) return FALSE;
+        fclose(file); return TRUE;
+    }();
+    return enabled;
+}
+
+// GeneralsX @input Codex 15/10/2026 A UI selection can append its group after the raw mouse batch.
+// Append the order after that queued group instead of losing the first order to the stale cache.
+static Bool gxPendingSelectedMoveGroup()
+{
+#if defined(__ANDROID__)
+    if (!TheMessageStream || !TheInGameUI || !TheInGameUI->areSelectedObjectsControllable()
+        || TheInGameUI->getSelectCount() == 0) return FALSE;
+    if (TheMessageStream->containsMessageOfType(GameMessage::MSG_CREATE_SELECTED_GROUP)
+        || TheMessageStream->containsMessageOfType(GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND)) return TRUE;
+    for (Int type = GameMessage::MSG_SELECT_TEAM0; type <= GameMessage::MSG_SELECT_TEAM9; ++type)
+        if (TheMessageStream->containsMessageOfType((GameMessage::Type)type)) return TRUE;
+#endif
+    return FALSE;
+}
+
+// GeneralsX @commands Codex 14/10/2026 Native attack-move handles noncombat members as ordinary move.
+static Bool gxDefaultAttackMove()
+{
+#if defined(__ANDROID__)
+	if (!TheInGameUI || !TheInGameUI->areSelectedObjectsControllable()) return FALSE;
+	const DrawableList *selection = TheInGameUI->getAllSelectedDrawables();
+	if (!selection) return FALSE;
+	for (DrawableListCIt it = selection->begin(); it != selection->end(); ++it) {
+		Object *obj = (*it)->getObject();
+		if (obj && obj->isLocallyControlled() && !obj->isEffectivelyDead() && !obj->isContained()
+			&& obj->isKindOf(KINDOF_CAN_ATTACK) && !obj->isKindOf(KINDOF_STRUCTURE)
+			&& !obj->isKindOf(KINDOF_DOZER) && !obj->isKindOf(KINDOF_HARVESTER)) return TRUE;
+	}
+#endif
+	return FALSE;
+}
+
 GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *pos, Drawable *drawableInWay,
 																																 CommandEvaluateType commandType )
 {
@@ -997,7 +1040,7 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 		isForceAttackable = obj->isKindOf(KINDOF_FORCEATTACKABLE);
 	}
 
-	if (m_teamExists)
+	if (m_teamExists || gxPendingSelectedMoveGroup())
 	{
 		if( TheInGameUI->isInWaypointMode() )
 		{
@@ -1017,7 +1060,7 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 		}
 		else
 		{
-			msgType = GameMessage::MSG_DO_MOVETO;
+			msgType = gxDefaultAttackMove() ? GameMessage::MSG_DO_ATTACKMOVETO : GameMessage::MSG_DO_MOVETO;
 		}
 		if( commandType == DO_COMMAND )
 		{
@@ -2437,7 +2480,7 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 					//Waypoint mode
 					msgType = GameMessage::MSG_ADD_WAYPOINT_HINT;
 				}
-				else if( TheInGameUI->isInAttackMoveToMode() )
+				else if( TheInGameUI->isInAttackMoveToMode() || (!TheInGameUI->isInForceMoveToMode() && gxDefaultAttackMove()) )
 				{
 					//THIS CODE WILL NEVER EVER GET CALLED! -- it's a context command now (READ: rip code out)
 					//Attack move
@@ -3871,6 +3914,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			m_rightMouseDownAnchor = msg->getArgument( 0 )->pixel;
 			m_rightMouseDownTimeMs = (UnsignedInt) msg->getArgument( 2 )->integer;
 			m_rightMouseDownCameraPos = TheTacticalView->getPosition();
+            if (gxMouseOrderTraceEnabled()) fprintf(stderr, "[GX-INPUT] RMB down %d,%d time=%u alt=%d team=%d\n",
+                m_rightMouseDownAnchor.x, m_rightMouseDownAnchor.y, m_rightMouseDownTimeMs, TheGlobalData->m_useAlternateMouse, m_teamExists);
 
 			break;
 		}
@@ -3882,6 +3927,12 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			m_rightMouseUpAnchor = msg->getArgument( 0 )->pixel;
 			m_rightMouseUpTimeMs = (UnsignedInt) msg->getArgument( 2 )->integer;
 			m_rightMouseUpCameraPos = TheTacticalView->getPosition();
+            if (gxMouseOrderTraceEnabled()) {
+                const Bool click = TheMouse->isClick(m_rightMouseDownAnchor, m_rightMouseUpAnchor,
+                    m_rightMouseDownCameraPos, m_rightMouseUpCameraPos, m_rightMouseDownTimeMs, m_rightMouseUpTimeMs);
+                fprintf(stderr, "[GX-INPUT] RMB up %d,%d dt=%u accepted=%d\n", m_rightMouseUpAnchor.x,
+                    m_rightMouseUpAnchor.y, m_rightMouseUpTimeMs-m_rightMouseDownTimeMs, click);
+            }
 
 			//Kris: July 7, 2003. Added this code to deselect build placement mode when right clicked. This fixes
 			//a bug where you couldn't cancel the sneak attack mode via right click. This only happened when you

@@ -59,6 +59,9 @@
          multiplayer client both need plain outbound HTTPS/WebSocket. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- GeneralsX @bugfix Android LAN: WifiManager.MulticastLock, held only while the
+         LAN lobby/match is active, so Wi-Fi drivers don't filter LAN broadcasts. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <!-- GeneralsX @bugfix Android port 10/07/2026 the sign-in flow backgrounds
          this app for the whole browser round-trip (open playgenerals.online,
@@ -77,8 +80,9 @@
          shared storage. The flag only has an effect on Android 10; Android 11+ ignores it and
          uses MANAGE_EXTERNAL_STORAGE ("All files access") as before. -->
     <application
-        android:label="@string/app_name"
+        android:label="${appLabel}"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="true"
         android:isGame="true"
         android:appCategory="game"
@@ -135,13 +139,20 @@
         <activity
             android:name=".SetupActivity"
             android:exported="true"
-            android:theme="@style/Theme.GeneralsZHSettings"
+            android:theme="@style/Theme.GeneralsZHStartup"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- GeneralsX @feature Android port 04/10/2026 Mod Manager Phase 1. -->
+        <activity
+            android:name=".ModManagerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.GeneralsZHSettings"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name=".FolderPickerActivity"

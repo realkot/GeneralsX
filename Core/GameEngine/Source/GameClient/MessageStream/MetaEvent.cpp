@@ -483,6 +483,10 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 		{
 			--index;
 			m_nextUpShouldCreateDoubleClick[index] = TRUE;
+			// GeneralsX @bugfix Codex 15/10/2026 SDL double-click is also a new press.
+			// Measure its release from this press, not the previous click's position;
+			// otherwise nearby rapid orders become a non-point region and are ignored.
+			m_mouseDownPosition[index] = msg->getArgument(0)->pixel;
 			break;
 		}
 
@@ -515,8 +519,7 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 
 			IRegion2D pixelRegion;
 			buildRegion( &m_mouseDownPosition[index], &location, &pixelRegion );
-			if (abs(pixelRegion.hi.x - pixelRegion.lo.x) < TheMouse->m_dragTolerance &&
-					abs(pixelRegion.hi.y - pixelRegion.lo.y) < TheMouse->m_dragTolerance)
+			if (TheMouse->isClickDistance(pixelRegion.hi - pixelRegion.lo))
 			{
 				pixelRegion.hi.x = pixelRegion.lo.x;
 				pixelRegion.hi.y = pixelRegion.lo.y;

@@ -90,6 +90,15 @@
 #include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/RankPointValue.h"
 
+// GeneralsX @feature Android port 02/10/2026 Zero Hour-only GeneralsOnline hooks in the online
+// load screen (this file is shared Core, compiled for base Generals too, where the defines
+// header is an empty stub and leaves GENERALS_ONLINE undefined).
+#include "GameNetwork/GeneralsOnline/NextGenMP_defines.h"
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
+static Bool s_bHasTakenLoadScreenProbe = FALSE;
+#endif
+
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -146,9 +155,15 @@ static const Int TELETYPE_UPDATE_FREQ = 2; // how many frames between teletype u
 // LoadScreen Class
 //-----------------------------------------------------------------------------
 
+// GeneralsX @performance Codex 15/10/2026 Loading callbacks can arrive thousands of times per second.
+// Service input/audio on every callback, but submit at most 30 UI frames per second on Android.
+static UnsignedInt s_gxLoadLastDraw = 0;
+static Bool s_gxLoadHasDrawn = FALSE;
+
 LoadScreen::LoadScreen()
 {
 	m_loadScreen = nullptr;
+    s_gxLoadHasDrawn = FALSE;
 }
 
 LoadScreen::~LoadScreen()
@@ -174,8 +189,6 @@ void LoadScreen::update( Int percent )
 	// The same applies to the briefing and movie loops further down this file, which have
 	// the same shape and the same omission, and which is why the problem was reported in
 	// the campaign as well.
-	TheWindowManager->update();
-	TheDisplay->update();
 	if (TheAudio)
 	{
 		static Int s_pumpCount = 0;
@@ -185,6 +198,17 @@ void LoadScreen::update( Int percent )
 		}
 		TheAudio->UPDATE();
 	}
+#if defined(__ANDROID__)
+    const UnsignedInt now = timeGetTime();
+    if (s_gxLoadHasDrawn && percent < 100 && now - s_gxLoadLastDraw < 33) {
+        setFPMode();
+        return;
+    }
+    s_gxLoadLastDraw = now;
+    s_gxLoadHasDrawn = TRUE;
+#endif
+    TheWindowManager->update();
+    TheDisplay->update();
 	// redraw all views, update the GUI
 	TheDisplay->draw();
 
@@ -558,7 +582,7 @@ void SinglePlayerLoadScreen::init( GameInfo *game )
 		// TheSuperHackers @bugfix Originally this movie render loop stopped rendering when the game window was inactive.
 		// This either skipped the movie or caused decompression artifacts. Now the video just keeps playing until it done.
 
-		Int progressUpdateCount = m_videoStream->frameCount() / FRAME_FUDGE_ADD;
+		Int progressUpdateCount = max(1, m_videoStream->frameCount() / FRAME_FUDGE_ADD);
 		Int shiftedPercent = -FRAME_FUDGE_ADD + 1;
 		while (m_videoStream->frameIndex() < m_videoStream->frameCount() - 1 )
 		{
@@ -670,7 +694,10 @@ void SinglePlayerLoadScreen::init( GameInfo *game )
 			TheWindowManager->update();
 			// No audio pump here either -- see the movie loop above. These wait on a movie.
 			TheDisplay->draw();
-			Sleep(100);
+            // GeneralsX @bugfix Codex 15/10/2026 Keep briefing UI responsive above the old 10 fps cap.
+            TheGameEngine->serviceWindowsOS();
+            if (TheAudio) TheAudio->UPDATE();
+            Sleep(16);
 			currTime = timeGetTime();
 		}
 
@@ -1088,7 +1115,7 @@ void ChallengeLoadScreen::init( GameInfo *game )
 		// TheSuperHackers @bugfix Originally this movie render loop stopped rendering when the game window was inactive.
 		// This either skipped the movie or caused decompression artifacts. Now the video just keeps playing until it done.
 
-		Int progressUpdateCount = m_videoStream->frameCount() / FRAME_FUDGE_ADD;
+		Int progressUpdateCount = max(1, m_videoStream->frameCount() / FRAME_FUDGE_ADD);
 		Int shiftedPercent = -FRAME_FUDGE_ADD + 1;
 		while (m_videoStream->frameIndex() < m_videoStream->frameCount() - 1 )
 		{
@@ -1176,7 +1203,10 @@ void ChallengeLoadScreen::init( GameInfo *game )
 			TheWindowManager->update();
 			// No audio pump here either -- see the movie loop above. These wait on a movie.
 			TheDisplay->draw();
-			Sleep(100);
+            // GeneralsX @bugfix Codex 15/10/2026 Keep briefing UI responsive above the old 10 fps cap.
+            TheGameEngine->serviceWindowsOS();
+            if (TheAudio) TheAudio->UPDATE();
+            Sleep(16);
 			currTime = timeGetTime();
 		}
 
@@ -1568,6 +1598,10 @@ extern Int GetAdditionalDisconnectsFromUserFile(Int playerID);
 
 void GameSpyLoadScreen::init( GameInfo *game )
 {
+#if defined(GENERALS_ONLINE)
+	s_bHasTakenLoadScreenProbe = FALSE;
+#endif
+
 	// create the layout of the load screen
 	m_loadScreen = TheWindowManager->winCreateFromScript( "Menus/GameSpyLoadScreen.wnd" );
 	DEBUG_ASSERTCRASH(m_loadScreen, ("Can't initialize the Multiplayer loadscreen"));
@@ -1903,6 +1937,22 @@ void GameSpyLoadScreen::update( Int percent )
 	if(percent <= 100)
 		TheNetwork->updateLoadProgress( percent );
 	TheNetwork->liteupdate();
+
+#if defined(GENERALS_ONLINE)
+	// GeneralsX @feature Android port 02/10/2026 Upstream GeneralsOnline: the loading screen's
+	// anti-cheat screenshot, half way through, uploaded once START_GAME's URL is known; and the
+	// online services ticked here, since the engine does not tick while a match loads -- on a
+	// phone that is long enough for the WebSocket to miss its keepalives.
+	if (percent >= 50 && !s_bHasTakenLoadScreenProbe && NGMP_OnlineServicesManager::GetInstance() != nullptr)
+	{
+		s_bHasTakenLoadScreenProbe = TRUE;
+		NGMP_OnlineServicesManager::GetInstance()->CaptureScreenshotForProbe(EScreenshotType::SCREENSHOT_TYPE_LOADSCREEN);
+	}
+	if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
+	{
+		NGMP_OnlineServicesManager::GetInstance()->Tick();
+	}
+#endif
 
 	//GadgetProgressBarSetProgress(m_progressBars[TheNetwork->getLocalPlayerID()], percent );
 

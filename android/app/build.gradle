@@ -2,9 +2,15 @@ plugins {
     id 'com.android.application'
 }
 
+// GeneralsX @build Codex 14/10/2026 Isolated input-testing APK, opt in at build time.
+def inputTest = System.getenv('GX_INPUT_TEST') == '1'
+
 android {
+    // GeneralsX @test Codex 14/10/2026 Exercise actual Android resources in JVM UI regressions.
+    testOptions { unitTests.includeAndroidResources = true }
     namespace 'com.generalsx.zerohour'
     compileSdk 35
+    buildFeatures { buildConfig true }
 
     // A fixed, committed debug keystore (android/app/debug.keystore) — NOT the
     // machine-local ~/.android/debug.keystore that Android tooling
@@ -28,6 +34,9 @@ android {
 
     defaultConfig {
         applicationId 'com.generalsx.zerohour'
+        if (inputTest) applicationIdSuffix '.inputtest'
+        manifestPlaceholders = [appLabel: inputTest ? 'Generals ZH Input Test' : '@string/app_name']
+        buildConfigField 'boolean', 'INPUT_TEST', inputTest.toString()
         // API 28 (Android 9): floor that still covers the Redmi Note 8 Pro
         // line while giving bionic glob(3) and stable Vulkan loader behavior.
         // The real graphics gate is the GPU driver, not the OS version — see
@@ -145,6 +154,8 @@ android {
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
     // Material Components for the Setup/Settings/Log-viewer screens only —
     // GeneralsZHActivity (the actual game surface) stays on its own plain
     // fullscreen theme and never touches these widgets.

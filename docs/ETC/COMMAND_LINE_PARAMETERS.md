@@ -91,6 +91,12 @@ grep -n "SKIRMISH_DIAG\|ScoreScreen\|SkirmishGameOptionsMenu" ~/Projects/General
 
 ## Source Code Reference
 
+Android input test r3 also supports a file-based diagnostic: place
+`gx_input_trace.txt` in the game working directory and restart. It records right
+button down/up coordinates, timing and click acceptance in the native stderr log.
+It does not log motion and is disabled by default. This is a diagnostic file,
+not a command-line switch.
+
 Command line parsing is implemented in:
 - `Core/GameEngine/Source/gameclient.cpp` - Client-side parameters
 - `GeneralsMD/Code/Main/WinMain.cpp` - Entry point and initial parsing

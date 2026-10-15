@@ -44,7 +44,12 @@ if [[ -z "${GAME_LIB}" ]]; then
     exit 1
 fi
 
-rm -rf "${JNILIBS}"
+# GeneralsX @build Codex 14/10/2026 Preserve previous generated libraries; never clear build dependencies.
+if [[ -d "${JNILIBS}" ]]; then
+    JNI_HISTORY="${PROJECT_ROOT}/build/packaging-history/jni-$(date +%s%N)"
+    mkdir -p "$(dirname "${JNI_HISTORY}")"
+    mv "${JNILIBS}" "${JNI_HISTORY}"
+fi
 mkdir -p "${JNILIBS}"
 cp "${GAME_LIB}" "${JNILIBS}/libmain.so"
 
@@ -195,7 +200,7 @@ if [[ ! -d "${SDL_JAVA_SRC}" ]]; then
     echo "ERROR: SDL3 Java sources not found at ${SDL_JAVA_SRC} (configure/build first)."
     exit 1
 fi
-rm -rf "${JAVA_SDL}"
+# Reuse the pinned SDL3 source tree; the .java copy restores vanilla files before applying patches.
 mkdir -p "${JAVA_SDL}/org/libsdl/app"
 cp "${SDL_JAVA_SRC}"/*.java "${JAVA_SDL}/org/libsdl/app/"
 echo "==> Staged SDL3 Java glue ($(ls "${JAVA_SDL}/org/libsdl/app" | wc -l | tr -d ' ') files)"
@@ -223,8 +228,8 @@ if [[ ! -f "${STAGING}/fonts/arial.ttf" ]]; then
     echo "==> Fonts not staged yet; fetching Liberation fonts"
     GX_FONTS="${STAGING}/fonts" "${PROJECT_ROOT}/scripts/build/ios/stage-fonts.sh"
 fi
-rm -rf "${ASSETS}/fonts"
-cp -R "${STAGING}/fonts" "${ASSETS}/fonts"
+mkdir -p "${ASSETS}/fonts"
+cp -R "${STAGING}/fonts/." "${ASSETS}/fonts/"
 
 # dxvk.conf — tuned translation-layer defaults (16x aniso, quiet logs).
 if [[ -f "${STAGING}/dxvk.conf" ]]; then
@@ -285,7 +290,7 @@ if [[ ! -f "${STAGING}/default_driver/meta.json" ]]; then
     echo "==> Default Vulkan driver not staged yet; fetching Turnip"
     GX_DEFAULT_DRIVER="${STAGING}/default_driver" "${PROJECT_ROOT}/scripts/build/android/fetch-turnip.sh"
 fi
-rm -rf "${DEFAULT_DRIVER_ASSETS}"
+# Reuse staged driver assets; the pinned files are overwritten below.
 mkdir -p "${DEFAULT_DRIVER_ASSETS}"
 cp -R "${STAGING}/default_driver/." "${DEFAULT_DRIVER_ASSETS}/"
 

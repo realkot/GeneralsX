@@ -52,6 +52,9 @@
 #include "Common/LocalFileSystem.h"
 #include "Common/AsciiString.h"
 #include "Common/PerfTimer.h"
+#include <algorithm>
+#include <set>
+#include <vector>
 
 
 //----------------------------------------------------------------------------
@@ -98,6 +101,8 @@ ArchiveFileSystem *TheArchiveFileSystem = nullptr;
 // Presence turns the community data patch off without removing it -- the
 // launcher writes and deletes this, and loadMods() below is the only reader.
 static const char* const kCommunityPatchDisableMarker = "gx_no_community_patch.txt";
+// Presence mounts the patch even when a data mod is installed; also written by the launcher.
+static const char* const kCommunityPatchWithModsMarker = "gx_community_patch_with_mods.txt";
 #endif
 
 static AsciiString getBaseFilename(const AsciiString& path)
@@ -118,6 +123,93 @@ static AsciiString getBaseFilename(const AsciiString& path)
 //------------------------------------------------------
 // ArchivedFileInfo
 //------------------------------------------------------
+// Standalone directory mods must behave like BIGs copied into the game root:
+// alphabetically first BIG wins a path; a same-named retail BIG is replaced
+// in its entirety. We emulate this without touching the actual game files.
+struct StandaloneModOverlayStats
+{
+	unsigned int maskedBaseEntries = 0;
+	unsigned int reorderedPaths = 0;
+	unsigned int affectedPaths = 0;
+	unsigned int sampleLines = 0;
+};
+
+static void reconcileStandaloneModDirectory(
+	ArchivedDirectoryInfo& directory,
+	const std::set<ArchiveFile*>& modArchives,
+	const std::set<ArchiveFile*>& primaryGameArchives,
+	const std::set<AsciiString>& replacedBaseNames,
+	StandaloneModOverlayStats& stats)
+{
+	ArchivedFileLocationMap::iterator it = directory.m_files.begin();
+	while (it != directory.m_files.end())
+	{
+		const AsciiString fileName = it->first;
+		const std::pair<ArchivedFileLocationMap::iterator, ArchivedFileLocationMap::iterator> range =
+			directory.m_files.equal_range(fileName);
+		const ArchivedFileLocationMap::iterator next = range.second;
+		std::vector<ArchiveFile*> before;
+		std::vector<ArchiveFile*> after;
+
+		for (ArchivedFileLocationMap::iterator entry = range.first; entry != range.second; ++entry)
+		{
+			ArchiveFile* archive = entry->second;
+			before.push_back(archive);
+			if (modArchives.find(archive) == modArchives.end() &&
+				primaryGameArchives.find(archive) != primaryGameArchives.end())
+			{
+				AsciiString name = getBaseFilename(archive->getName());
+				name.toLower();
+				if (replacedBaseNames.find(name) != replacedBaseNames.end())
+				{
+					++stats.maskedBaseEntries;
+					continue;
+				}
+			}
+			after.push_back(archive);
+		}
+
+		// Original retail priority stays unchanged. For the active mod BIGs,
+		// alphabetical FIRST wins (not the last archive mounted with TRUE).
+		std::stable_sort(after.begin(), after.end(),
+			[&modArchives](ArchiveFile* a, ArchiveFile* b) {
+				const bool aMod = modArchives.find(a) != modArchives.end();
+				const bool bMod = modArchives.find(b) != modArchives.end();
+				if (aMod != bMod)
+					return aMod;
+				if (!aMod)
+					return false;
+				const int baseCmp = getBaseFilename(a->getName()).compareNoCase(getBaseFilename(b->getName()));
+				if (baseCmp != 0)
+					return baseCmp < 0;
+				return a->getName().compareNoCase(b->getName()) < 0;
+			});
+
+		if (before != after)
+		{
+			++stats.affectedPaths;
+			if (!before.empty() && !after.empty() && before.front() != after.front())
+				++stats.reorderedPaths;
+			if (stats.sampleLines < 12)
+			{
+				fprintf(stderr, "[gxmod-overlay] path=%s%s before=%s after=%s\n",
+					directory.m_path.str(), fileName.str(),
+					before.empty() ? "<none>" : before.front()->getName().str(),
+					after.empty() ? "<masked>" : after.front()->getName().str());
+				++stats.sampleLines;
+			}
+			directory.m_files.erase(range.first, range.second);
+			for (std::vector<ArchiveFile*>::const_iterator value = after.begin(); value != after.end(); ++value)
+				directory.m_files.insert(std::make_pair(fileName, *value));
+		}
+
+		it = next;
+	}
+	for (ArchivedDirectoryInfoMap::iterator child = directory.m_directories.begin();
+		child != directory.m_directories.end(); ++child)
+		reconcileStandaloneModDirectory(child->second, modArchives, primaryGameArchives, replacedBaseNames, stats);
+}
+
 ArchiveFileSystem::ArchiveFileSystem()
 {
 }
@@ -274,6 +366,7 @@ void ArchiveFileSystem::loadMods()
 
 		AsciiString patchPath;
 		AsciiString disableMarkerPath;
+		AsciiString withModsMarkerPath;
 
 		if (userData.isNotEmpty())
 		{
@@ -282,6 +375,9 @@ void ArchiveFileSystem::loadMods()
 
 			disableMarkerPath = userData;
 			disableMarkerPath.concat(kCommunityPatchDisableMarker);
+
+			withModsMarkerPath = userData;
+			withModsMarkerPath.concat(kCommunityPatchWithModsMarker);
 		}
 
 		// The PC client has a settings switch for this (DataPacks_UseCommunityPatch)
@@ -290,10 +386,64 @@ void ArchiveFileSystem::loadMods()
 		const Bool disabled = disableMarkerPath.isNotEmpty()
 			&& TheLocalFileSystem->doesFileExist(disableMarkerPath.str());
 
+		// GeneralsX @bugfix Android port 27/09/2026 Not with a mod. The patch is the whole Zero
+		// Hour INI set re-laid out as directories (Data\INI\CommandButton\*.ini, Object\...,
+		// with CommandButton.ini itself emptied). A mod such as Contra 007 (!Contra007.big)
+		// replaces the single-file originals and wins on the files both have, but not on the
+		// patch's directory files, so both sets of definitions got loaded and the mod stopped
+		// starting -- on 1.2.2, before the patch existed, it ran. The patch only exists to match
+		// a PC lobby's INI checksum, which a modded install cannot match anyway. Mods name their
+		// archives with a leading '!' so that they sort ahead of the retail ones (which all start
+		// with a letter); -mod is the other way a mod is loaded.
+		//
+		// Only an archive that carries game data (Data\INI\...) counts: UI and texture add-ons
+		// (HD control bars, texture packs) use the same '!' prefix, touch no INI, and must not
+		// keep a player out of PC lobbies. The launcher applies the same rule to say which mod
+		// it found (DataPackInstaller.findDataMod), and can set the player's override below.
+		AsciiString modArchive;
+		for (ArchiveFileMap::const_iterator it = m_archiveFileMap.begin(); it != m_archiveFileMap.end(); ++it)
+		{
+			const AsciiString base = getBaseFilename(it->first);
+			if (base.isEmpty() || base.getCharAt(0) != '!' || it->second == nullptr)
+				continue;
+			FilenameList iniFiles;
+			it->second->getFileListInDirectory(AsciiString(""), AsciiString(""), AsciiString("*.ini"), iniFiles, TRUE);
+			for (FilenameList::const_iterator f = iniFiles.begin(); f != iniFiles.end(); ++f)
+			{
+				if (f->startsWithNoCase("data\\ini\\") || f->startsWithNoCase("data/ini/"))
+				{
+					modArchive = base;
+					break;
+				}
+			}
+			if (modArchive.isNotEmpty())
+				break;
+		}
+		if (modArchive.isEmpty() && TheGlobalData->m_modBIG.isNotEmpty())
+			modArchive = TheGlobalData->m_modBIG;
+		if (modArchive.isEmpty() && TheGlobalData->m_modDir.isNotEmpty())
+			modArchive = TheGlobalData->m_modDir;
+
+		// The player's override from the launcher ("use the patch with mods too"), for a mod
+		// built on top of the GeneralsOnline patch: written beside the disable marker.
+		const Bool withMods = withModsMarkerPath.isNotEmpty()
+			&& TheLocalFileSystem->doesFileExist(withModsMarkerPath.str());
+		if (modArchive.isNotEmpty() && withMods && !disabled)
+		{
+			fprintf(stderr, "[gxbig] mod %s installed, community patch mounted anyway (launcher "
+				"switch)\n", modArchive.str());
+			modArchive.clear();
+		}
+
 		if (disabled)
 		{
 			fprintf(stderr, "[gxbig] community patch disabled by %s; INI stays retail\n",
 				disableMarkerPath.str());
+		}
+		else if (modArchive.isNotEmpty())
+		{
+			fprintf(stderr, "[gxbig] community patch not mounted: a mod is installed (%s), and the "
+				"patch would mix its own INI files into the mod's\n", modArchive.str());
 		}
 		else if (patchPath.isNotEmpty() && TheLocalFileSystem->doesFileExist(patchPath.str()))
 		{
@@ -336,10 +486,54 @@ void ArchiveFileSystem::loadMods()
 
 	if (TheGlobalData->m_modDir.isNotEmpty())
 	{
+		// Pointer snapshot identifies successfully mounted mod BIGs regardless
+		// of basename collisions with physical retail BIGs.
+		std::set<ArchiveFile*> previousArchives;
+		for (ArchiveFileMap::const_iterator existing = m_archiveFileMap.begin();
+			existing != m_archiveFileMap.end(); ++existing)
+			previousArchives.insert(existing->second);
+
 		MAYBE_UNUSED Bool ret = loadBigFilesFromDirectory(TheGlobalData->m_modDir, "*.big", TRUE);
 		(void)ret;
 		DEBUG_ASSERTLOG(ret, ("loadBigFilesFromDirectory(%s) returned FALSE!", TheGlobalData->m_modDir.str()));
+
+		std::set<ArchiveFile*> modArchives;
+		std::set<AsciiString> replacedNames;
+		for (ArchiveFileMap::const_iterator mounted = m_archiveFileMap.begin();
+			mounted != m_archiveFileMap.end(); ++mounted)
+		{
+			if (mounted->second == nullptr ||
+				previousArchives.find(mounted->second) != previousArchives.end())
+				continue;
+			modArchives.insert(mounted->second);
+			AsciiString name = getBaseFilename(mounted->second->getName());
+			name.toLower();
+			replacedNames.insert(name);
+		}
+		if (!modArchives.empty())
+		{
+			StandaloneModOverlayStats stats;
+			reconcileStandaloneModDirectory(m_rootDirectory, modArchives, m_primaryGameArchives, replacedNames, stats);
+			m_standaloneModOverlayActive = TRUE;
+			fprintf(stderr,
+				"[gxmod-overlay] active_mod_bigs=%u masked_base_entries=%u affected_paths=%u reordered_winners=%u\n",
+				(unsigned)modArchives.size(), stats.maskedBaseEntries,
+				stats.affectedPaths, stats.reorderedPaths);
+			fflush(stderr);
+		}
 	}
+}
+
+// Query the reconciled archive lookup tree, not the physical BIG list. This
+// preserves Mod Manager's existing virtual replacement / masking semantics.
+FileInstance ArchiveFileSystem::getFileCount(const Char* filename) const
+{
+	if (filename == nullptr || filename[0] == '\0')
+		return 0;
+	ArchivedDirectoryInfoResult result = const_cast<ArchiveFileSystem*>(this)->getArchivedDirectoryInfo(filename);
+	if (!result.valid())
+		return 0;
+	return static_cast<FileInstance>(result.dirInfo->m_files.count(result.lastToken));
 }
 
 Bool ArchiveFileSystem::doesFileExist(const Char *filename, FileInstance instance) const
@@ -438,9 +632,19 @@ ArchiveFile* ArchiveFileSystem::getArchiveFile(const AsciiString& filename, File
 
 void ArchiveFileSystem::getFileListInDirectory(const AsciiString& currentDirectory, const AsciiString& originalDirectory, const AsciiString& searchName, FilenameList &filenameList, Bool searchSubdirectories) const
 {
+	// Do not enumerate paths that belonged only to a virtually replaced BIG.
+	// Preserve loose files already inserted into filenameList by the caller.
+	FilenameList archiveNames;
+	FilenameList& output = m_standaloneModOverlayActive ? archiveNames : filenameList;
 	ArchiveFileMap::const_iterator it = m_archiveFileMap.begin();
 	while (it != m_archiveFileMap.end()) {
-		it->second->getFileListInDirectory(currentDirectory, originalDirectory, searchName, filenameList, searchSubdirectories);
+		it->second->getFileListInDirectory(currentDirectory, originalDirectory, searchName, output, searchSubdirectories);
 		it++;
+	}
+	if (m_standaloneModOverlayActive)
+	{
+		for (FilenameList::const_iterator candidate = archiveNames.begin(); candidate != archiveNames.end(); ++candidate)
+			if (getArchiveFile(*candidate) != nullptr)
+				filenameList.insert(*candidate);
 	}
 }
