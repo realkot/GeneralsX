@@ -1026,6 +1026,9 @@ public class SetupActivity extends Activity {
             cursorBox.setVisibility(checked ? android.view.View.VISIBLE : android.view.View.GONE);
         });
         UiKit.helpText(content, getString(R.string.setup_mouse_mode_help));
+        // GeneralsX @feature Codex 16/10/2026 Separate physical-pointer and army preferences.
+        UiKit.button(content, UiKit.BTN_TONAL, R.drawable.ic_gzh_sliders, getString(R.string.tablet_controls_title),
+            () -> startActivity(new Intent(this, TabletControlsActivity.class)));
     }
 
     private static int readMouseCursorPercent(File marker) {

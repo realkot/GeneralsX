@@ -90,6 +90,8 @@
         android:supportsRtl="true"
         android:requestLegacyExternalStorage="true">
 
+        <activity android:name=".TabletControlsActivity" android:exported="false" android:theme="@style/Theme.GeneralsZHSettings" />
+
         <activity
             android:name=".GeneralsZHActivity"
             android:exported="true"

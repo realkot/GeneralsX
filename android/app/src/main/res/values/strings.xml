@@ -489,4 +489,38 @@
     <string name="setup_cursor_size_label">Cursor size: %1$d%%</string>
     <string name="setup_switch_skip_intro">Skip intro movies</string>
     <string name="setup_switch_skip_intro_desc">EA logos, the intro and other movies before the menu are skipped; the game goes straight to loading. For both games, mods included.</string>
+
+    <!-- GeneralsX @feature Codex 16/10/2026 Tablet control settings. -->
+    <string name="tablet_controls_title">Tablet controls</string>
+    <string name="tablet_restart_hint">Saved automatically. Fully close and restart the game to apply these settings.</string>
+    <string name="tablet_orders">Orders and diagnostics</string>
+    <string name="tablet_attack_move">Attack-move by default</string>
+    <string name="tablet_attack_move_desc">Off uses normal movement. The existing force-move shortcut always keeps normal movement.</string>
+    <string name="tablet_diagnostics">Record mouse orders</string>
+    <string name="tablet_diagnostics_desc">Local bounded log of button events, command translation and dispatch; no motion or typed text.</string>
+    <string name="tablet_open_log">View order log</string>
+    <string name="tablet_army_panel">Army buttons</string>
+    <string name="tablet_scale">Button size</string>
+    <string name="tablet_width">Button width</string>
+    <string name="tablet_opacity">Background opacity</string>
+    <string name="tablet_left">Horizontal offset</string>
+    <string name="tablet_bottom">Lift from bottom</string>
+    <string name="tablet_collapsed">Start with army buttons collapsed</string>
+    <string name="tablet_collapsed_desc">Right-click or long-press + to collapse/expand the army. A normal + tap toggles groups.</string>
+    <string name="tablet_fit_labels">Fit captions to button width</string>
+    <string name="tablet_fit_labels_desc">Measured text fitting with a minimum readable font size.</string>
+    <string name="tablet_army_screen">Show screen army button</string>
+    <string name="tablet_army_map">Show map army button</string>
+    <string name="tablet_planes">Show planes button</string>
+    <string name="tablet_helicopters">Show helicopters button</string>
+    <string name="tablet_ground">Show ground army button</string>
+    <string name="tablet_physical_cursor">Physical mouse cursor</string>
+    <string name="tablet_cursor_size">Cursor size</string>
+    <string name="tablet_cursor_outline">High-contrast outline</string>
+    <string name="tablet_cursor_outline_desc">Adds a dark outline to nontransparent cursor pixels.</string>
+    <string name="tablet_defaults">Restore r9 control defaults</string>
+    <string name="tablet_back">Back</string>
+    <string name="tablet_save_error">Could not save settings. Check available storage.</string>
+    <string name="tablet_no_log">No order log yet. Enable recording, restart the game and reproduce the issue.</string>
+    <string name="tablet_log_error">Could not read the order log.</string>
 </resources>

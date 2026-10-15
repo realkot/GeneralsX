@@ -439,4 +439,38 @@
     <string name="setup_cursor_size_label">Размер курсора: %1$d%%</string>
     <string name="setup_switch_skip_intro">Пропускать заставки</string>
     <string name="setup_switch_skip_intro_desc">Логотипы EA, вступительное видео и другие ролики перед меню не показываются — игра сразу переходит к загрузке. Для обеих игр, и с модами тоже.</string>
+
+    <!-- GeneralsX @feature Codex 16/10/2026 Tablet control settings. -->
+    <string name="tablet_controls_title">Управление на планшете</string>
+    <string name="tablet_restart_hint">Сохраняется автоматически. Полностью закройте и запустите игру для применения настроек.</string>
+    <string name="tablet_orders">Приказы и диагностика</string>
+    <string name="tablet_attack_move">Атака в движении по умолчанию</string>
+    <string name="tablet_attack_move_desc">Выключите для обычного движения. Штатная команда принудительного движения сохраняет обычное движение.</string>
+    <string name="tablet_diagnostics">Записывать приказы мыши</string>
+    <string name="tablet_diagnostics_desc">Ограниченный локальный журнал кнопок, распознавания и передачи приказов; без движения мыши и вводимого текста.</string>
+    <string name="tablet_open_log">Открыть журнал приказов</string>
+    <string name="tablet_army_panel">Кнопки армии</string>
+    <string name="tablet_scale">Размер кнопок</string>
+    <string name="tablet_width">Ширина кнопок</string>
+    <string name="tablet_opacity">Непрозрачность фона</string>
+    <string name="tablet_left">Смещение по горизонтали</string>
+    <string name="tablet_bottom">Отступ снизу</string>
+    <string name="tablet_collapsed">Начинать со скрытыми кнопками армии</string>
+    <string name="tablet_collapsed_desc">ПКМ или удержание + скрывает/показывает армию. Обычное нажатие + переключает группы.</string>
+    <string name="tablet_fit_labels">Подгонять подписи по ширине</string>
+    <string name="tablet_fit_labels_desc">Подбор шрифта по измеренной ширине текста с ограничением минимального размера.</string>
+    <string name="tablet_army_screen">Кнопка армии на экране</string>
+    <string name="tablet_army_map">Кнопка армии на всей карте</string>
+    <string name="tablet_planes">Кнопка самолётов</string>
+    <string name="tablet_helicopters">Кнопка вертолётов</string>
+    <string name="tablet_ground">Кнопка наземных войск</string>
+    <string name="tablet_physical_cursor">Курсор физической мыши</string>
+    <string name="tablet_cursor_size">Размер курсора</string>
+    <string name="tablet_cursor_outline">Контрастная обводка</string>
+    <string name="tablet_cursor_outline_desc">Добавляет тёмную обводку непрозрачных пикселей курсора.</string>
+    <string name="tablet_defaults">Вернуть исходные настройки управления</string>
+    <string name="tablet_back">Назад</string>
+    <string name="tablet_save_error">Не удалось сохранить настройки. Проверьте доступное место.</string>
+    <string name="tablet_no_log">Журнала пока нет. Включите запись, перезапустите игру и повторите проблему.</string>
+    <string name="tablet_log_error">Не удалось прочитать журнал приказов.</string>
 </resources>
