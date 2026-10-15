@@ -29,6 +29,8 @@
 #ifndef _WIN32
 
 #include "SDL3GameEngine.h"
+#include "Common/GXInputTrace.h"
+#include "Common/GXPointerButtons.h"
 #include "OpenALAudioManager.h"
 #include "SDL3Device/GameClient/SDL3Mouse.h"
 #include "SDL3Device/GameClient/SDL3Keyboard.h"
@@ -177,6 +179,7 @@ static bool SDLCALL mobileLifecycleWatcher(void *userdata, SDL_Event *event)
 			s_appInactive.store(true);
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
+                GXInputTrace::record("lifecycle", "focus gained");
 			logMobileLifecycleEvent("WINDOW_FOCUS_GAINED");
 			s_appInactive.store(false);
 			break;
@@ -2543,6 +2546,8 @@ static Bool s_cancelAfterFrame = FALSE;
 
 void cancelPointerGesture()
 {
+    s_physicalButtons=0;
+    GXInputTrace::record("cancel", "pointer gesture and held buttons reset");
     GadgetListBoxTouchScrollEnd();
     TouchInput::reportUiHold(0, 0, FALSE);
     if (s_touch.phase == TouchState::PLACING && TheInGameUI)
@@ -2608,10 +2613,13 @@ Bool handlePhysicalMouse(SDL_Event &event, SDL_Window *window)
         mouse->setPhysicalPointer(TRUE);
     }
 #if defined(__ANDROID__)
-    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
-        s_physicalButtons |= SDL_BUTTON_MASK(event.button.button);
-    if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
-        s_physicalButtons &= ~SDL_BUTTON_MASK(event.button.button);
+    // GeneralsX @bugfix Codex 16/10/2026 Drop unmatched releases after focus/device cancellation.
+    if(event.type==SDL_EVENT_MOUSE_BUTTON_DOWN || event.type==SDL_EVENT_MOUSE_BUTTON_UP) {
+        if(!GXPointerButtons::accept(s_physicalButtons,SDL_BUTTON_MASK(event.button.button),event.button.down)) {
+            GXInputTrace::record("drop", "orphan release button=%u",(unsigned)event.button.button);
+            return TRUE;
+        }
+    }
     int w = 0, h = 0;
     SDL_GetWindowSize(window, &w, &h);
     if (!TheDisplay || w <= 0 || h <= 0) return TRUE;
@@ -2626,6 +2634,7 @@ Bool handlePhysicalMouse(SDL_Event &event, SDL_Window *window)
         && event.button.button == SDL_BUTTON_MIDDLE) {
         const Bool down = event.button.down;
         cancelPointerGesture();
+        s_physicalButtons=down?SDL_BUTTON_MMASK:0;
         s_middlePan = down && !touchPointBelongsToUi(x, y)
             && TheGameLogic && TheGameLogic->isInInteractiveGame()
             && !TheGameLogic->isGamePaused() && !gxScriptOwnsCamera();
@@ -2933,6 +2942,7 @@ void SDL3GameEngine::pollSDL3Events(void)
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
+                GXInputTrace::record("lifecycle", "focus lost");
 #if defined(SAGE_MOBILE_PLATFORM)
                 cancelMobileInput();
                 s_cancelAfterFrame = TRUE;
@@ -2952,6 +2962,7 @@ void SDL3GameEngine::pollSDL3Events(void)
 			// App suspension/resume: mirror the desktop focus handling so audio
 			// and mouse state pause cleanly (the render gate lives in update()).
 			case SDL_EVENT_DID_ENTER_BACKGROUND:
+                GXInputTrace::record("lifecycle", "background");
                 cancelMobileInput();
                 s_cancelAfterFrame = TRUE;
 				m_IsActive = false;
@@ -2973,6 +2984,7 @@ void SDL3GameEngine::pollSDL3Events(void)
 				break;
 
 			case SDL_EVENT_DID_ENTER_FOREGROUND:
+                GXInputTrace::record("lifecycle", "foreground");
 				m_IsActive = true;
 				if (TheMouse) {
 					TheMouse->regainFocus();
