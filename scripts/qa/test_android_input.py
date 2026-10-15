@@ -314,6 +314,7 @@ print('PASS layout structure, unique IDs, button bounds/non-overlap, 12 language
 # Lifecycle watcher is deliberately atomic-only; never access engine objects from its thread.
 watcher = engine[:engine.index('namespace {')]
 assert 'cancelMobileInput();' not in watcher
+assert 'GXInputTrace::record' not in watcher
 assert 'cancelMobileInput();' in engine[engine.index('void SDL3GameEngine::pollSDL3Events'):]
 poll_prefix = engine[engine.index('void SDL3GameEngine::pollSDL3Events'):engine.index('while (SDL_PollEvent')]
 assert 'SDL_StartTextInput' not in poll_prefix and 'SDL_HasKeyboard' not in poll_prefix
