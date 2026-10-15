@@ -179,7 +179,6 @@ static bool SDLCALL mobileLifecycleWatcher(void *userdata, SDL_Event *event)
 			s_appInactive.store(true);
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
-                GXInputTrace::record("lifecycle", "focus gained");
 			logMobileLifecycleEvent("WINDOW_FOCUS_GAINED");
 			s_appInactive.store(false);
 			break;
@@ -2934,6 +2933,7 @@ void SDL3GameEngine::pollSDL3Events(void)
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
+                GXInputTrace::record("lifecycle", "focus gained");
 				m_IsActive = true;
 				if (TheMouse) {
 					TheMouse->regainFocus();
