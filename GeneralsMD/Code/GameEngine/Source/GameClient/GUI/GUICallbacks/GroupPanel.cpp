@@ -113,6 +113,7 @@ static Bool s_armyCollapsed = FALSE;
 static UnsignedInt s_handlePress = 0;
 struct GXPanelFontState {
     GameFont *base=nullptr;
+    Bool initialized=FALSE;Color colors[6]={};
     Int width=0,height=0;
     UnicodeString text;
 };
@@ -122,17 +123,25 @@ static void gxStylePanelButton(GameWindow *button, Int width, Int height)
     if(!button)return;
     const auto &settings=GXTabletControls::get();
     auto &state=s_panelFonts[button];
-    if(!state.base)state.base=button->winGetFont();
+    if(!state.initialized) {
+        state.base=button->winGetFont();state.initialized=TRUE;
+        state.colors[0]=button->winGetEnabledColor(0);state.colors[1]=button->winGetDisabledColor(0);
+        state.colors[2]=button->winGetHiliteColor(0);state.colors[3]=button->winGetEnabledBorderColor(0);
+        state.colors[4]=button->winGetDisabledBorderColor(0);state.colors[5]=button->winGetHiliteBorderColor(0);
+    }
     UnicodeString text=button->winGetText();
     if(state.width==width && state.height==height && state.text==text)return;
     state.width=width;state.height=height;state.text=text;
-    Int alpha=255*settings.panelOpacity/100;
-    button->winSetEnabledColor(0,GameMakeColor(14,27,37,alpha));
-    button->winSetDisabledColor(0,GameMakeColor(14,27,37,alpha));
-    button->winSetHiliteColor(0,GameMakeColor(30,53,70,alpha));
-    button->winSetEnabledBorderColor(0,GameMakeColor(150,134,85,alpha));
-    button->winSetDisabledBorderColor(0,GameMakeColor(90,90,90,alpha));
-    button->winSetHiliteBorderColor(0,GameMakeColor(220,200,115,alpha));
+    const auto fade=[&](Color color)->Color {
+        UnsignedInt raw=(UnsignedInt)color;
+        return (Color)((raw&0x00ffffffu)|(((raw>>24)*settings.panelOpacity/100)<<24));
+    };
+    button->winSetEnabledColor(0,fade(state.colors[0]));
+    button->winSetDisabledColor(0,fade(state.colors[1]));
+    button->winSetHiliteColor(0,fade(state.colors[2]));
+    button->winSetEnabledBorderColor(0,fade(state.colors[3]));
+    button->winSetDisabledBorderColor(0,fade(state.colors[4]));
+    button->winSetHiliteBorderColor(0,fade(state.colors[5]));
     if(!state.base || !TheFontLibrary)return;
     Int target=max(1,state.base->pointSize*settings.panelScale/100);
     GameFont *font=TheFontLibrary->getFont(state.base->nameString,target,state.base->bold);
