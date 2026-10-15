@@ -1012,6 +1012,8 @@ static Bool gxPendingSelectedMoveGroup()
 static Bool gxDefaultAttackMove()
 {
 #if defined(__ANDROID__)
+    // GeneralsX @feature Codex 16/10/2026 Owner can restore ordinary movement without changing contextual orders.
+    if (!GXTabletControls::get().attackMove || (TheInGameUI && TheInGameUI->isInForceMoveToMode())) return FALSE;
 	if (!TheInGameUI || !TheInGameUI->areSelectedObjectsControllable()) return FALSE;
 	const DrawableList *selection = TheInGameUI->getAllSelectedDrawables();
 	if (!selection) return FALSE;
