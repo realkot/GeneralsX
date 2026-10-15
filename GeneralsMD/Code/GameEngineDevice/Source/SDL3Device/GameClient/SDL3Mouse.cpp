@@ -31,6 +31,7 @@
 #include "SDL3Device/GameClient/SDL3Mouse.h"
 #include <cstdio>
 #include "Common/GXInputTrace.h"
+#include "GameClient/GXCursorGeometry.h"
 #include <cstring>
 
 // GeneralsX @bugfix felipebraz 18/02/2026 Include GameLogic for frame tracking
@@ -342,35 +343,39 @@ AnimatedCursor* SDL3Mouse::loadCursorFromFile(const char* filepath)
 				#endif
 
 #ifdef __ANDROID__
-				// GeneralsX @tweak Codex 15/10/2026 Double physical mouse cursor art and
-				// its hot spot together so tablet pointers remain visible without shifting clicks.
-				bool enlarged = true;
-				SDL_Surface *largeFrames[MAX_2D_CURSOR_ANIM_FRAMES] = {};
-				for (int i = 0; i < frame_index; ++i) {
-					SDL_Surface *source = cursor->m_frameSurfaces[i];
-					largeFrames[i] = SDL_ScaleSurface(source, source->w * 2, source->h * 2, SDL_SCALEMODE_NEAREST);
-					if (!largeFrames[i]) enlarged = false;
-				}
-				for (int i = 0; i < frame_index; ++i) {
-					if (enlarged) {
-						frame_infos[i].surface = largeFrames[i];
-					} else if (largeFrames[i]) {
-						SDL_DestroySurface(largeFrames[i]);
-						largeFrames[i] = nullptr;
-					}
-				}
-				if (enlarged) {
-					hot_spot_x *= 2;
-					hot_spot_y *= 2;
-				}
+                // GeneralsX @feature Codex 16/10/2026 Configurable native cursor; retain software originals.
+                const int cursorPercent = GXTabletControls::get().cursorPercent;
+                const int originalHotX = hot_spot_x, originalHotY = hot_spot_y;
+                bool enlarged = true;
+                SDL_Surface *largeFrames[MAX_2D_CURSOR_ANIM_FRAMES] = {};
+                for (int i=0;i<frame_index;++i) {
+                    SDL_Surface *source=cursor->m_frameSurfaces[i];
+                    SDL_Surface *rgba=nullptr;
+                    if (GXTabletControls::get().cursorOutline) {
+                        rgba=SDL_ConvertSurface(source, SDL_PIXELFORMAT_RGBA32);
+                        if(rgba) GXCursorGeometry::outline((unsigned char*)rgba->pixels,rgba->w,rgba->h,rgba->pitch);
+                    }
+                    largeFrames[i]=SDL_ScaleSurface(rgba ? rgba : source,
+                        GXCursorGeometry::scale(source->w,cursorPercent),GXCursorGeometry::scale(source->h,cursorPercent),SDL_SCALEMODE_LINEAR);
+                    if(rgba)SDL_DestroySurface(rgba);
+                    if(!largeFrames[i])enlarged=false;
+                }
+                for(int i=0;i<frame_index;++i) {
+                    if(enlarged)frame_infos[i].surface=largeFrames[i];
+                    else if(largeFrames[i]) {SDL_DestroySurface(largeFrames[i]);largeFrames[i]=nullptr;}
+                }
+                if(enlarged) {
+                    hot_spot_x=GXCursorGeometry::hotspot(originalHotX,cursorPercent,largeFrames[0]->w);
+                    hot_spot_y=GXCursorGeometry::hotspot(originalHotY,cursorPercent,largeFrames[0]->h);
+                }
 #endif
 				cursor->m_hotX = hot_spot_x;
 				cursor->m_hotY = hot_spot_y;
 #ifdef __ANDROID__
 				// The software touchpad renderer still uses the original surfaces.
 				if (enlarged) {
-					cursor->m_hotX /= 2;
-					cursor->m_hotY /= 2;
+					cursor->m_hotX = originalHotX;
+					cursor->m_hotY = originalHotY;
 				}
 #endif
 				// GeneralsX @bugfix felipebraz 28/04/2026 Use SDL native animated cursor to ensure frame playback.
