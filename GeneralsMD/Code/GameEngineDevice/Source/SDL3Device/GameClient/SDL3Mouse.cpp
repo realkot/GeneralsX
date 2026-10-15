@@ -30,6 +30,7 @@
 // GeneralsX @bugfix BenderAI 13/02/2026 Fix include path (fighter19 pattern)
 #include "SDL3Device/GameClient/SDL3Mouse.h"
 #include <cstdio>
+#include "Common/GXInputTrace.h"
 #include <cstring>
 
 // GeneralsX @bugfix felipebraz 18/02/2026 Include GameLogic for frame tracking
@@ -1156,6 +1157,9 @@ void SDL3Mouse::addSDLEvent(SDL_Event *event)
 			return;
 		}
 	}
+    if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP)
+        GXInputTrace::record("raw", "type=%u button=%u x=%.1f y=%.1f",
+            (unsigned)event->type, (unsigned)event->button.button, event->button.x, event->button.y);
 	m_pendingEvents.push_back(*event);
 }
 

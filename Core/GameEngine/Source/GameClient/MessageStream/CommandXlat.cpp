@@ -38,6 +38,7 @@
 #include "Common/GameType.h"
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
+#include "Common/GXInputTrace.h"
 #include "Common/MessageStream.h"
 #include "Common/MiscAudio.h"
 #include "Common/MultiplayerSettings.h"
@@ -989,12 +990,7 @@ static Object *iNeedAHero()
 // GeneralsX @diagnostics Codex 15/10/2026 Opt-in click tracing; no motion logging or protocol changes.
 static Bool gxMouseOrderTraceEnabled()
 {
-    static const Bool enabled = []() -> Bool {
-        FILE *file = fopen("gx_input_trace.txt", "r");
-        if (!file) return FALSE;
-        fclose(file); return TRUE;
-    }();
-    return enabled;
+    return GXInputTrace::enabled();
 }
 
 // GeneralsX @input Codex 15/10/2026 A UI selection can append its group after the raw mouse batch.
@@ -1065,6 +1061,7 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 		if( commandType == DO_COMMAND )
 		{
 			GameMessage *movemsg = TheMessageStream->appendMessage( msgType );
+            GXInputTrace::record("enqueue", "type=%d selected=%d", (int)msgType, TheInGameUI->getSelectCount());
 			if (msgType == GameMessage::MSG_DO_ATTACK_OBJECT)
 				movemsg->appendObjectIDArgument( obj->getID() );
 			else
@@ -2516,6 +2513,10 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage *msg)
 {
 	GameMessage::Type t = msg->getType();
+    if (t == GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN || t == GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP
+        || t == GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN || t == GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP)
+        GXInputTrace::record("translate", "type=%d selected=%d enabled=%d", (int)t,
+            TheInGameUI->getSelectCount(), TheInGameUI->getInputEnabled());
 	GameMessageDisposition disp = KEEP_MESSAGE;
 	// We want to always be able to get to the options menu even during no input times and a clear game data message should always go through
 	if (t != GameMessage::MSG_META_OPTIONS && t != GameMessage::MSG_CLEAR_GAME_DATA &&
@@ -3930,7 +3931,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
             if (gxMouseOrderTraceEnabled()) {
                 const Bool click = TheMouse->isClick(m_rightMouseDownAnchor, m_rightMouseUpAnchor,
                     m_rightMouseDownCameraPos, m_rightMouseUpCameraPos, m_rightMouseDownTimeMs, m_rightMouseUpTimeMs);
-                fprintf(stderr, "[GX-INPUT] RMB up %d,%d dt=%u accepted=%d\n", m_rightMouseUpAnchor.x,
+                GXInputTrace::record("click", "RMB up %d,%d dt=%u accepted=%d", m_rightMouseUpAnchor.x,
                     m_rightMouseUpAnchor.y, m_rightMouseUpTimeMs-m_rightMouseDownTimeMs, click);
             }
 

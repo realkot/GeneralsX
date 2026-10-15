@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/GXInputTrace.h"
 
 #include "Common/CRCDebug.h"
 #include "GXTrace.h"
@@ -613,11 +614,15 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		}
 		case GameMessage::MSG_DO_ATTACKMOVETO:
 		{
+            GXInputTrace::record("dispatch", "type=%d group=%d", (int)msg->getType(),
+                currentlySelectedGroup ? (int)currentlySelectedGroup->getAllIDs().size() : 0);
 			onDoAttackmoveto(msg, currentlySelectedGroup);
 			break;
 		}
 		case GameMessage::MSG_DO_FORCEMOVETO:
 		{
+            GXInputTrace::record("dispatch", "type=%d group=%d", (int)msg->getType(),
+                currentlySelectedGroup ? (int)currentlySelectedGroup->getAllIDs().size() : 0);
 			onDoForcemoveto(msg, currentlySelectedGroup);
 			break;
 		}
@@ -625,6 +630,8 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		case GameMessage::MSG_DO_SALVAGE:
 		case GameMessage::MSG_DO_MOVETO:
 		{
+            GXInputTrace::record("dispatch", "type=%d group=%d", (int)msg->getType(),
+                currentlySelectedGroup ? (int)currentlySelectedGroup->getAllIDs().size() : 0);
 			onDoMoveto(msg, currentlySelectedGroup);
 			break;
 		}
