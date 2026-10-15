@@ -1,295 +1,89 @@
-> **GeneralsX [mod by realkot] — Android test r9**
->
-> [Download the tested APK](apk/GeneralsZH-InputTest-20261015-r9.apk?raw=true) · [Detailed Russian changelog](CHANGELOG_RU.md) · [Validation and limitations](docs/WORKDIR/reports/ANDROID_INPUT_TEST_R9.md)
->
-> Based on [koreazolfakar-droid](https://github.com/koreazolfakar-droid/GeneralsZH-Android-Port) with selected changes from the [MYSOREZ](https://github.com/MYSOREZ/GeneralsZH-Android-Port) lineage. Includes tablet mouse/keyboard controls, army selectors, a right-aligned HD control panel and camera/Extras improvements. The broad r8 upscale and additional renderer/AI experiments were reverted; only the six HD control-panel atlases remain. Package: `com.generalsx.zerohour.inputtest`. Original game data must be supplied separately. Existing upstream documentation below describes the parent project and may differ from this test build.
+# GeneralsX [mod by realkot]
 
-# Command & Conquer Generals: Zero Hour — Android
+Android-порт **Command & Conquer: Generals Zero Hour** с доработками управления на планшете, интерфейса и удобства игры. Актуальная тестовая версия — **r9**.
 
-> **This is an unofficial, community-made fan port.** It is not affiliated
-> with, endorsed by, or produced by Electronic Arts, Westwood Studios, or any
-> other rights holder, and it is not an official Google Play / App Store
-> release. It's a fork maintained by volunteers (see
-> [Lineage & credits](#lineage--credits)) built from EA's own GPL v3 source
-> release. If you saw this described anywhere as an "official" release, that's
-> wrong — please don't spread it further.
+**[Скачать APK r9](https://github.com/realkot/GeneralsX/releases/download/inputtest-20261015-r9/GeneralsZH-InputTest-20261015-r9.apk)** · [Все сборки и история изменений](https://github.com/realkot/GeneralsX/releases) · [Краткий changelog](CHANGELOG_RU.md) · [English changelog](CHANGELOG_EN.md)
 
-### Generals — the front line just went mobile.
+Android 9+, ARM64. Отдельный пакет `com.generalsx.zerohour.inputtest`. Оригинальные данные установленной Zero Hour необходимо предоставить отдельно. Это неофициальная модификация, не связанная с Electronic Arts.
 
-You thought this war was over? That the GLA was finished, the Particle Cannon had fallen silent
-and the last SCUD Storm had burned out? Think again. The war has gone global — and commanding it
-from a bunker, chained to a desk behind a stationary PC, is no longer enough. The front needs a
-new breed of officer: forward commanders who deploy their HQ anywhere and lead the charge on the
-move. **The world needs more Generals. Your time has come, Mobile Generals.**
+## Что изменилось относительно родительских проектов
 
-*Command & Conquer: Generals – Zero Hour* launches a full-scale invasion of Android, and nine
-Generals are waiting for your orders. Rule the skies with General Granger's air power, burn
-through the enemy with General Alexander's lasers, or unleash General Townes' Particle Cannon for
-the USA. Steamroll the line with General Kwai's Overlords, bring down General Tao's nuclear fire,
-or bury the enemy under General Fai's endless infantry for China. Or fight the GLA way — poison
-the battlefield with Dr. Thrax's toxins, rig it to blow with General Juhziz, and strike unseen
-with Prince Kassad's stealth.
+Основа — [koreazolfakar-droid/GeneralsZH-Android-Port](https://github.com/koreazolfakar-droid/GeneralsZH-Android-Port) (`3793ab15`), с выборочными переносами из веток этого проекта и [MYSOREZ/GeneralsZH-Android-Port](https://github.com/MYSOREZ/GeneralsZH-Android-Port) (main `576e2265`). Перенесённые разработки сохраняют авторство; возможности исходного порта не считаются написанными здесь с нуля.
 
-Build your Command Center, secure your supply lines and wipe the enemy off the map — straight
-from your touchscreen. And the desk-bound commanders are no longer out of reach: **meet PC players
-on the same online battlefield.**
+### Армия и группы
 
-*General, the uplink is ready. Target coordinates received — engage!*
+Пять кнопок находятся внизу слева, в свободной области рядом с панелью. Строители, добытчики и здания не включаются в боевую армию.
 
-<img width="500" height="281" alt="IMG_3457_500" src="https://github.com/user-attachments/assets/aeaf6692-36e6-40c8-b9f8-8066d014ec4b" />
-
-**Zero Hour running natively on Android** — campaign, skirmish, Generals Challenge,
-and full online multiplayer (GeneralsOnline: lobby, custom match, quickmatch,
-persona/stats, friends & social), with touch controls built for RTS (tap-select,
-drag-box, long-press deselect, two-finger pan, pinch/anchor zoom). No emulation:
-this is the real 2003 engine compiled for ARM64, rendering DirectX 8 →
-[DXVK](https://github.com/doitsujin/dxvk) → **Vulkan native** — no translation
-layer beyond DXVK itself, since Android speaks Vulkan directly.
-
-There is a **second, independent renderer**: DirectX 8 → **OpenGL ES 3.0**,
-through a native translation layer written for this port (optionally routed
-through [ANGLE](https://github.com/google/angle)), with **no DXVK and no
-Vulkan involved at all**. It started as the way to run on phones whose Vulkan
-driver can't carry DXVK and is now the default, because it has worked on every
-device tested so far; Vulkan remains one tap away in the launcher.
-
-Built on EA's GPL v3 source release, standing on a chain of community work —
-[TheSuperHackers](https://github.com/TheSuperHackers/GeneralsGameCode),
-[Fighter19's original Unix port](https://github.com/Fighter19/CnC_Generals_Zero_Hour), and
-[fbraz3/GeneralsX](https://github.com/fbraz3/GeneralsX) — this fork is the
-Android port: native touch controls, the in-app launcher, GeneralsOnline
-multiplayer with cross-play against PC, and language packs. See
-[Lineage & credits](#lineage--credits) for who built what, and
-[the story of the port](docs/port/PORT_STORY.md) for how it went. The macOS
-and iOS/iPadOS builds inherited from the original project are not maintained
-here; their notes are in [docs/port/APPLE_PLATFORMS.md](docs/port/APPLE_PLATFORMS.md).
-
-**No game assets are included or distributed.** You need your own copy
-([Steam](https://store.steampowered.com/app/2732960/), ~$5 on sale).
-
-## Status
-
-| Feature | Status |
+| Кнопка | Действие |
 |---|---|
-| Campaign / Skirmish / Generals Challenge | ✅ Working |
-| Rendering — OpenGL ES (DirectX 8 → GLES 3.0, no DXVK) | ✅ Working — **the default.** A native backend written for this port; it works on every device tested so far, including ones whose Vulkan driver renders corrupted graphics. |
-| Rendering — Vulkan (DirectX 8 → DXVK → Vulkan) | ✅ Working — selectable in Setup. Native Vulkan 1.3 (Adreno 7xx/8xx), adaptive Vulkan 1.1 fallback (Mali-G76/G57). Faster where the driver handles it; unusable on some (PowerVR BXM, Samsung Xclipse — see [Known issues](#known-issues)). |
-| Audio | ✅ Working (OpenAL, OpenSL/AAudio backends) |
-| Video / cutscenes | ✅ Working (FFmpeg) |
-| Touch controls | ✅ Working — native touch, not mouse emulation (see [Touch controls](#touch-controls)) |
-| Online multiplayer (GeneralsOnline) | ✅ Working — real matches between real players, P2P transport |
-| Cross-play with PC (Windows) GeneralsOnline players | ✅ Working — new in 1.3.0; the PC player turns their anti-cheat off. If a match goes out of sync, send the logs and the replay |
-| Game text languages | ✅ English plus 12 packs: Russian, Ukrainian, German, French, Spanish, Brazilian Portuguese, Polish, Interslavic, Simplified Chinese, Korean, Arabic, Persian — right-to-left layout and CJK glyphs included. [Add yours](languages/README.md) |
-| Updates without a new APK | ✅ Signed engine builds and network settings straight from this repository (Home → Updates) |
-| Simulation rate | ✅ 30 Hz (retail) or 60 Hz, chosen in the launcher — the APK carries both engines |
-| Performance on Vulkan-1.1-only GPUs (Mali) | ⚠️ Playable, but CPU-bound — expect lower FPS and occasional freezes on weaker/older phones |
+| Экран | Выделить боевые юниты на видимой части карты |
+| Карта | Выделить боевые юниты на всей карте |
+| Самолёты | Выделить боевые самолёты на всей карте |
+| Вертол. | Выделить боевые вертолёты на всей карте, включая подходящие вооружённые транспорты |
+| Наземные | Первое нажатие — наземная армия на экране; повторное — на всей карте |
+| + | Показать/скрыть кнопки групп 0–9 над армейскими кнопками |
 
-- **Android**: primary target. Grab a prebuilt APK from
-  [Releases](../../releases/latest) — no toolchain needed. Campaign, skirmish,
-  and Generals Challenge run natively. **Online
-  multiplayer works, including actual matches — and, since 1.3.0, against PC
-  players**: [GeneralsOnline](https://www.playgenerals.online) (the community
-  service by the GeneralsOnline Development Team that replaced the long-dead
-  GameSpy servers; this port brings its client to Android) drives account login,
-  the multiplayer lobby, Custom Match (create/browse/join, live room + player
-  lists, chat), Quickmatch, My Persona (stats/rank), and Communicator
-  (friends/social) — and matches now actually start and play: a P2P transport
-  (Valve's [GameNetworkingSockets](https://github.com/ValveSoftware/GameNetworkingSockets),
-  built from source for Android with native ICE/STUN/TURN, no external WebRTC
-  dependency) replaces the legacy transport that internet games never had a
-  real implementation for. This has been shaken out against real players and
-  real devices, including bug reports from outside testers via this repo's
-  [issue tracker](../../issues) — see
-  [`docs/port/ANDROID_PORT.md`](docs/port/ANDROID_PORT.md) for the device/driver
-  matrix and the full bring-up log.
+![r9: панель справа, кнопки армии и раскрытые группы](docs/images/realkot/groups-r9.png)
 
-## Touch controls
+### Панель управления и её качество
 
-Battlefield input is **native**: a finger is not turned into a mouse. Taps,
-double taps, long presses, the two-finger cancel and ability targeting are
-resolved directly against the engine's own decision-making — pick what is
-under the finger, project it into the world, ask the engine what order that
-means. The orders produced are identical to the ones the mouse path
-produces, so multiplayer and replays are unaffected.
+Панель сохраняет исходные пропорции и прижата к правому краю; слева видна карта. Для США, Китая и ГЛА сохранены **шесть атласов панели, увеличенных в 4 раза** с помощью Real-ESRGAN. Прозрачность и координаты кнопок сохранены. Это улучшение панели, а не всей графики игры.
 
-Taps on the control bar and menus are still ordinary clicks, deliberately: a
-tap on a button *is* a click, and the window manager's handling of it is
-correct. The window manager also gets first refusal on every battlefield tap,
-so a tap on a panel never falls through to the map underneath.
+![r9: пропорциональная панель справа и свободная карта слева](docs/images/realkot/hud-r9.png)
 
-| Gesture | Action |
-|---|---|
-| Tap on the map | Select what is under your finger, or — with units selected — give them the order that point implies (move, attack, enter, repair …) |
-| Tap a unit you own | Select it. If the engine says your current selection has a *specific* interaction with it (get in, repair), that happens instead |
-| Double-tap | Select every unit of that type on screen |
-| Press and hold, then drag | Selection box |
-| Drag | Pan the camera (direct, no mouse involved) |
-| Two fingers | Pan and zoom together |
-| Long press on the map (~0.6s, no movement) | Cancel an armed ability or a pending building; otherwise clear the selection |
-| Two-finger tap | The same cancel |
-| Tap a UI button | Press it |
-| Hold a UI button | Read its description, without pressing it |
-| **With an ability armed**: touch the map, drag, release | Aim it — the radius circle follows your finger; release fires it where you let go; a second finger cancels |
-| **With a building picked**: tap where it goes | Place it. The ghost appears under your finger, not before you point |
-| Drag inside a list (games, players, chat, maps) | Scroll it |
-| Arrow button, bottom right of a builder's command bar | Flip to the second page of structures |
-| Force-attack / waypoint buttons on the command bar | The touch equivalents of Ctrl-click and Alt-click |
+Сравнение текстуры панели США: сверху оригинал, снизу обработанный вариант из r7, сохранённый в r9. Это сравнение ресурса, а не два снимка боя.
 
-More on how gestures are classified, why screen-edge scrolling is off on touch, the **Touch
-input overlay** for reporting control problems, and how to add a gesture:
-[`docs/port/TOUCH_CONTROLS.md`](docs/port/TOUCH_CONTROLS.md).
+![Оригинальная панель США и обработка Real-ESRGAN x4](docs/images/realkot/hud-quality-r7.png)
 
-## Quick start — Android
+### Мышь, клавиатура и приказы
 
-DirectX 8 → DXVK → **Vulkan native**, or the OpenGL ES renderer below. DXVK's own minimum was lowered from Vulkan
-1.3 to **Vulkan 1.1**, with an adaptive feature/extension fallback path, so
-it now runs on a much wider range of hardware: Snapdragon with Adreno
-7xx/8xx (native 1.3), older Adreno below 1.3 (via an optional bundled Mesa
-Turnip fallback driver), and Vulkan-1.1-only Arm Mali GPUs (Mali-G76,
-Mali-G57, and similar Bifrost/Valhall chips — e.g. the Redmi Note 8 Pro) are
-all supported. A device with no usable Vulkan driver at all still gets a
-clear on-screen message instead of silently closing. Frame rate on
-Vulkan-1.1-only / older-CPU devices is CPU-bound, not GPU-bound — expect
-lower FPS and occasional freezes on weaker phones; see the doc for the full
-device/driver matrix and driver-replacement options.
+- Физические ЛКМ/ПКМ работают через штатную схему игры; колесо меняет масштаб, удержание средней кнопки перемещает камеру, подведение к краю прокручивает карту.
+- Расширены обработка клавиатуры, модификаторов и клавиш; горячие клавиши зависят от игровых данных. Физический курсор увеличен вдвое.
+- Исправлены потеря событий мыши, первый приказ после выделения и координаты повторных быстрых кликов. Предпросмотр постройки следует за курсором без удержания ЛКМ.
+- Обычное движение боевой группы использует **атаку в движении**. Взаимодействие с целью, специальные и принудительные команды сохраняют собственное поведение.
 
-**If Vulkan doesn't work on your phone, there is a second renderer.** The
-Setup app has a **Render Backend** picker with three options: *Vulkan*
-(DXVK), *OpenGL ES* (the default) and *OpenGL ES + ANGLE*. The GLES options do
-not use DXVK or Vulkan at all — they run DirectX 8 through a translation
-layer written for this port
-([`Core/Libraries/Source/d3d8gles/`](Core/Libraries/Source/d3d8gles)) straight
-onto OpenGL ES 3.0, which every Android GPU speaks. That covers devices whose
-Vulkan driver exists but can't carry DXVK, which previously had nothing to
-fall back on. Switching backends needs no rebuild: change it in Setup and
-restart the game. GLES is the default because it works on every device tested
-so far; Vulkan can be faster where the driver handles DXVK well.
+### Камера и Extras
 
-**Simplest option — no build, no CI**: grab a prebuilt APK from the
-[Releases page](../../releases/latest) and sideload it.
+Предел ручной высоты камеры — **3600**. Начальная камера и сценарные пролёты сохраняют свои настройки. Исправлены открытие, применение, отмена и возврат из Extras; кнопка размещена в свободном месте заголовка Options. Оформление согласовано с основными настройками, маленькие квадратные маркеры шкал убраны. Доступны высота/наклон камеры, скорость прокрутки и дальность отрисовки.
 
-Every build is signed with the same committed key, so a newer APK installs
-**over** an older one without uninstalling. A fork can also build in GitHub
-Actions (**Actions tab → Build Android → Run workflow**, manual only), though
-that workflow ships the 30 Hz engine only.
+Снимок Extras из r8: показанное оформление сохранено в r9; графические эксперименты r8 в текущую версию не входят.
 
-**No adb needed, for setup or logs**: the game's icon opens a launcher with an
-in-app folder picker (point it at wherever you copied your own game files —
-Downloads, an SD card, anywhere), a log viewer with Clear/Share buttons, the
-GeneralsOnline account and network data, language packs and updates. See [docs/port/ANDROID_PORT.md §4](docs/port/ANDROID_PORT.md#4-game-data-and-first-run--the-in-app-setup-flow-no-adb-no-pc-needed)
-for the full first-run walkthrough. A default log is small and readable —
-if a bug report needs more (frame-timing breakdown, full trace, DXVK HUD
-counters, Vulkan validation), see [**Diagnostic marker files**](docs/port/ANDROID_PORT.md#diagnostic-marker-files-opt-in-extra-logging)
-for which plain-text file to drop into the game folder and what it turns on.
+![Extras: оформление штатных настроек и пять шкал без квадратных маркеров](docs/images/realkot/extras-r8.png)
 
-Building locally instead needs the Android NDK (r26+), vcpkg, meson/ninja:
+### Лаунчер, загрузка и совместимость
 
-```sh
-cd GeneralsX
-git submodule update --init references/fbraz3-dxvk
-export ANDROID_NDK_HOME=~/Android/Sdk/ndk/<version>
-./scripts/build/android/build-dual-hz.sh           # both engines (30 Hz + 60 Hz) and the APK
-```
+Выборочно перенесены менеджер модов, импорт и проверка данных, темы и локализация лаунчера, исправления сохранений/карт, командных страниц, аудио и сетевой безопасности. Убраны лишние перерисовки загрузки; исправлены подписи групп и масштабирование шрифтов пользовательских окон. Стартовый логотип EA пропускается. Изменены подписи проекта в меню и настройках.
 
-**→ The full guide (device/driver matrix, storage layout, multiplayer
-architecture, bring-up log): [docs/port/ANDROID_PORT.md](docs/port/ANDROID_PORT.md)**
+Снимок лаунчера из r2 иллюстрирует перенесённый интерфейс; не является новым снимком r9.
 
-## Where things are
+![Лаунчер: запуск, выбор мода, графика и инструменты](docs/images/realkot/launcher-r2.png)
 
-| Path | What it is |
-|---|---|
-| [`docs/port/ANDROID_PORT.md`](docs/port/ANDROID_PORT.md) | The Android port: architecture, GeneralsOnline multiplayer backend, device/driver matrix, build + bring-up log |
-| [`docs/port/PORT_STORY.md`](docs/port/PORT_STORY.md) | How the port went: GameSpy's death, async callbacks, storage, the allocator hunt |
-| [`docs/port/TOUCH_CONTROLS.md`](docs/port/TOUCH_CONTROLS.md) | How touch gestures are recognised, and the input overlay for bug reports |
-| [`languages/`](languages/README.md) | Game-text language packs, and how to add one |
-| [`docs/port/APPLE_PLATFORMS.md`](docs/port/APPLE_PLATFORMS.md) | The macOS / iOS / iPadOS builds inherited from the original project — not maintained here |
-| `docs/port/RELEASE_CHECKLIST.md` | Gate for public release |
-| `scripts/get-assets.sh` | Steam asset fetcher (your own copy; app 2732960) |
-| `scripts/build/android/` | Android build and packaging |
-| `android/` | Gradle shell app (SDLActivity) that packages `libmain.so` + DXVK into an APK, plus the Setup/FolderPicker/LogViewer/GeneralsOnline-account activities |
-| `GeneralsMD/Code/GameEngine/Source/GameNetwork/GeneralsOnline/` | The GeneralsOnline multiplayer client: auth, lobby, rooms, stats, matchmaking, social — talks to a REST + WebSocket backend, not GameSpy |
-| `Core/Libraries/Source/d3d8gles/` | The DirectX 8 → OpenGL ES 3.0 renderer: device/state emulation, fixed-function-to-GLSL shader generation, texture upload (including a software BC1-3 decoder for GPUs without S3TC) |
-| `Patches/dxvk-android.patch` | DXVK changes the Android d3d8/d3d9 `.so` builds are built from |
+![r9: главное меню с подписью GeneralsX mod by realkot](docs/images/realkot/menu-r9.png)
 
-## Known issues
+## Что отменено в r9
 
-- Android on Vulkan-1.1-only GPUs (Mali-G76, Mali-G57, and similar) is
-  CPU-bound: expect lower frame rates and occasional freezes on weaker/older
-  phones, especially during map/mission loading, and please share logs if you
-  hit something worse than that — see
-  [docs/port/ANDROID_PORT.md §2](docs/port/ANDROID_PORT.md#2-the-device--driver-matrix-read-this-before-filing-black-screen-bugs)
-  for the device/driver matrix.
-- Vulkan renders corrupted graphics on some GPU drivers, and no setting in
-  Setup can fix it — the corruption is below the game. Magenta patches,
-  distorted geometry and duplicated/overlapping menu elements have been
-  reported on PowerVR BXM and Samsung Xclipse. This is why OpenGL ES is the
-  default; if Vulkan looks wrong on your device, switch back to it in Setup →
-  Render Backend, which also now shows your GPU's own name.
-- Magenta textures are usually a game-files problem rather than a renderer
-  one, and the build says which: `[gxmiss] magenta substituted (<reason>):
-  <file>` names the file and why (no thumbnail, archive missing, unreadable),
-  and `[d3d8gles] MAGENTA:` names an unsupported texture format. Zero Hour is
-  an expansion — if base *Generals* archives (`Terrain.big`, `Textures.big`,
-  `W3D.big`) are absent, most of the artwork has nowhere to come from. Setup
-  lists any missing archive by name and can be pointed at a separate base-game
-  folder.
-- Cross-play with PC players is new. Both sides must compute the same game
-  frame by frame, and the remaining differences are found from real matches:
-  if a game against a PC goes out of sync, please send the launcher's logs
-  **and the replay** (yours and, if you can, the PC player's `.rep`) in an
-  [issue](../../issues).
+Отменены массовый апскейл меню r8 (97 дополнительных игровых атласов и 14 изображений лаунчера), дополнительные изменения рендеринга/GLES/terrain/HLOD/shadow, AI/поиска пути/приоритета скриптов и раскрытия тумана попаданиями. Панель справа и её шесть HD-атласов сохранены. Графическая основа возвращена к выбранному main koreazolfakar-droid.
 
-## Support the project
+## Проверка и ограничения
 
-This port is developed with [Claude Code](https://claude.com/claude-code) (Anthropic's Claude),
-and the subscription is paid out of pocket. If the port is useful to you and you'd like to help
-keep it going, donations are welcome — they go to that subscription.
+Исходники отката прошли 47 Android-тестов и проверки реального кода ввода/интерфейса. Проверены пакет, подпись, ресурсы и оба движка; в MuMu — схватка ГЛА на «Одиноком орле (4)», панель, кнопки и запуск движка 60 Гц. Движки 30/60 Гц унаследованы от родительского проекта; это не гарантия 30/60 FPS.
 
-| Currency and network | Address |
-|---|---|
-| **USDT — TRON (TRC20)** | `TAQHCF733ovKpvBjUgvkE6wHxkntnKZ6br` |
-| **USDT — BSC (BEP20)** | `0x52c05c81485d68367385ff389cf19a453f036310` |
-| **USDT — TON** (no memo needed) | `UQAOdBpFSPhlgbvUIJ2O2w2NuwWashaNjFWDsOirDqH9kGbR` |
+Полоска GLES при высокой камере **не объявляется исправленной**. «Взлом спутников 2» не менялся. Проверка MuMu не заменяет тестирование физического планшета, всех модов и мультиплеера. Используйте разрешение с соотношением сторон экрана: иначе исходный рендерер может растянуть весь кадр. Перед заменой версии сохраните настройки и сохранения; установка старой версии поверх новой может быть отклонена Android.
 
-Send **USDT only, and only over the network written next to the address** — any other token,
-or USDT over a different network, will be lost. Donations support development only: the game
-and every build stay free, and nothing is unlocked by donating. *Command & Conquer* is a
-trademark of Electronic Arts; this is an unofficial fan project.
+## История сборок
 
-## Lineage & credits
+Все 10 ранее собранных APK, включая r6 UI-control, опубликованы в [Releases](https://github.com/realkot/GeneralsX/releases) как тестовые версии с русскими/английскими примечаниями и SHA-256. Архивные версии публикуются без пересборки; **r8 — отменённый эксперимент**, для текущего тестирования выбирайте r9. Архивные теги ссылаются на снимок публикации r9, а не на точные старые деревья исходников.
 
-This port is the newest link in a long chain, and the earlier links did foundational
-work that this repo inherits everywhere:
+## English overview
 
-- **Westwood / EA Pacific** — the game; **EA** — the GPL v3 source release
-- **[TheSuperHackers/GeneralsGameCode](https://github.com/TheSuperHackers/GeneralsGameCode)** —
-  the community mainline: build modernization, VC6→modern toolchain, and much of the
-  cross-platform groundwork, including the FFmpeg video backend authored by
-  **[feliwir](https://github.com/feliwir)** (of [OpenSAGE](https://github.com/OpenSAGE/OpenSAGE)),
-  who also authored the OpenAL audio device work this port's audio stack builds on
-- **[Fighter19/CnC_Generals_Zero_Hour](https://github.com/Fighter19/CnC_Generals_Zero_Hour)** —
-  the original Unix/64-bit port: SDL3 platform management, C++17
-  filesystem/threading, Freetype/Fontconfig text rendering, and the DXVK approach
-  this renderer path descends from
-- **[fbraz3/GeneralsX](https://github.com/fbraz3/GeneralsX)** — the macOS/Linux port,
-  integrating and extending the above
-- **[ammaarreshi/Generals-Mac-iOS-iPad](https://github.com/ammaarreshi/Generals-Mac-iOS-iPad)** —
-  the macOS / iOS / iPadOS port this repository was forked from (arm64-ios cross-build,
-  DXVK on iOS, touch controls, app lifecycle, packaging)
-- **[GeneralsOnline Development Team](https://github.com/GeneralsOnlineDevelopmentTeam)** —
-  [GeneralsOnline](https://www.playgenerals.online), the online service and PC client
-  whose client this port brings to Android, and whose community data patch and
-  maps the launcher downloads
-- **This fork** — the Android port (the GeneralsOnline client on Android and
-  cross-play with PC, touch controls, in-app launcher, language packs, device
-  bring-up), plus engine fixes throughout, offered upstream
-- **DXVK, SDL, OpenAL Soft, FFmpeg, GameNetworkingSockets, Liberation Fonts** — the load-bearing walls
+This unofficial Android Zero Hour modification adds tablet mouse/keyboard improvements, screen/map/air/ground army selectors, control-group buttons, a proportional right-aligned HUD with six retained 4x HD panel atlases, a 2x physical cursor, working Extras and a 3600 manual camera ceiling. Combat movement defaults to attack-move; contextual and forced orders retain their own behavior. Loading redraws, captions, build previews and mouse ordering were corrected. Selected launcher/mod/save/audio/network improvements come from the parent lineages.
 
-Not part of that chain: **[tarek369/GeneralsZH-Android](https://github.com/tarek369/GeneralsZH-Android)**
-is a separate, independent Android port — this one is not built on it. Problems its users
-report are checked against this port too, and fixed here when they turn out to exist here as
-well; a couple of bugs (a duplicate-symbol build break, an INI-parsing gap) were traced faster
-thanks to its published engineering log.
+**r9 reverts the broad r8 menu upscale and additional renderer/AI experiments while retaining the HUD work.** The high-camera GLES strip is not claimed fixed; Satellite Hack 2 is unchanged. See the [English changelog](CHANGELOG_EN.md) and bilingual [release notes](https://github.com/realkot/GeneralsX/releases). Screenshots are labeled by build; invisible input/performance changes cannot be proven by screenshots.
 
-Engine code **GPL v3** (EA's source release → the chain above → this fork). Game
-assets: not included, not licensed here.
+## Authors, source and local builds
+
+Thanks to [koreazolfakar-droid](https://github.com/koreazolfakar-droid/GeneralsZH-Android-Port), [MYSOREZ](https://github.com/MYSOREZ/GeneralsZH-Android-Port), EA/Westwood/EA Pacific, [TheSuperHackers](https://github.com/TheSuperHackers/GeneralsGameCode), [Fighter19](https://github.com/Fighter19/CnC_Generals_Zero_Hour), [fbraz3](https://github.com/fbraz3/GeneralsX), [ammaarreshi](https://github.com/ammaarreshi/Generals-Mac-iOS-iPad), the [GeneralsOnline team](https://github.com/GeneralsOnlineDevelopmentTeam), and the SDL, DXVK, OpenAL, FFmpeg and other dependency authors. HUD reconstruction used [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN). Parent attribution remains in source history and comments.
+
+Engine source: [GPL v3](LICENSE.md). Original game data is required separately; this repository does not grant rights to original game assets. This is not an official EA product.
+
+Build locally with the preserved toolchain using `scripts/build/android/build-dual-hz.sh` and one unchanged source tree for both engines. For this test identity set `GX_INPUT_TEST=1`, `GX_ANDROID_VERSION_CODE=10309`, `GX_ANDROID_VERSION_NAME=1.4.0-inputtest.20261015-r9`, `GX_PRESERVE_BUILD_ENV=1`. See the [parent Android build guide](docs/port/ANDROID_PORT.md) for prerequisites and [r9 validation report](docs/WORKDIR/reports/ANDROID_INPUT_TEST_R9.md) for the actual test scope. Inherited guides may describe parent features absent from r9. CI builds are not launched for this publication.

@@ -4,13 +4,8 @@ permissions:
   contents: read
   pull-requests: write
 
+# GeneralsX @build Codex 15/10/2026 Owner publishes local builds; no automatic CI.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
