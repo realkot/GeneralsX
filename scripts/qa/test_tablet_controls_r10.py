@@ -53,3 +53,23 @@ int main(){
 source=OUT/'tablet-controls-r10.cpp';source.write_text(code)
 subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'Core/GameEngine/Include'),str(source),'-o',str(OUT/'tablet-controls-r10')],check=True)
 subprocess.run([str(OUT/'tablet-controls-r10')],check=True)
+
+# Isolate each trace process so the production startup-only opt-in cache is exercised.
+import tempfile
+trace_source=OUT/'tablet-trace-r10.cpp'
+trace_source.write_text(r'''
+#include "Common/GXInputTrace.h"
+#include <cassert>
+int main(int argc,char**){
+ if(argc>1){FILE*f=fopen("gx_input_trace.txt","w");assert(f);fclose(f);}
+ for(int i=0;i<20000;++i)GXInputTrace::record("test","event=%d no text or motion",i);
+ FILE*f=fopen("gx_input_trace.log","r");
+ if(argc==1){assert(!f);return 0;}
+ assert(f);fseek(f,0,SEEK_END);assert(ftell(f)>0&&ftell(f)<513*1024);fclose(f);
+}
+''')
+subprocess.run(['g++','-std=c++17','-I',str(ROOT/'Core/GameEngine/Include'),str(trace_source),'-o',str(OUT/'tablet-trace-r10')],check=True)
+for enabled in (False,True):
+    folder=tempfile.mkdtemp(prefix='r10-trace-',dir=OUT)
+    subprocess.run([str(OUT/'tablet-trace-r10')]+(['on'] if enabled else []),cwd=folder,check=True)
+print('PASS production diagnostics opt-in and 512 KiB trace wrapping; isolated QA folders retained')
