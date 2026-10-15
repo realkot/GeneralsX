@@ -2615,8 +2615,8 @@ Bool handlePhysicalMouse(SDL_Event &event, SDL_Window *window)
 #if defined(__ANDROID__)
     // GeneralsX @bugfix Codex 16/10/2026 Drop unmatched releases after focus/device cancellation.
     if(event.type==SDL_EVENT_MOUSE_BUTTON_DOWN || event.type==SDL_EVENT_MOUSE_BUTTON_UP) {
-        if(!GXPointerButtons::accept(s_physicalButtons,SDL_BUTTON_MASK(event.button.button),event.button.down)) {
-            GXInputTrace::record("drop", "orphan release button=%u",(unsigned)event.button.button);
+        if(!GXPointerButtons::accept(s_physicalButtons,GXPointerButtons::mask(event.button.button),event.button.down)) {
+            GXInputTrace::record("drop", "unmatched or invalid button=%u",(unsigned)event.button.button);
             return TRUE;
         }
     }

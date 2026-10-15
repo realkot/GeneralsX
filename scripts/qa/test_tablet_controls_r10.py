@@ -20,6 +20,8 @@ int main(){
  fwrite(input.data(),1,input.size(),f);rewind(f);GXTabletControls::parse(f,s);fclose(f);
  assert(s.attackMove==0&&s.cursorPercent==250&&s.panelScale==100&&s.panelMask==0&&s.panelWidth==100&&s.panelOpacity==50&&s.fitLabels==1);
  unsigned held=0;
+ assert(GXPointerButtons::mask(0)==0&&GXPointerButtons::mask(33)==0);
+ assert(GXPointerButtons::mask(1)==1&&GXPointerButtons::mask(32)==0x80000000u);
  assert(!GXPointerButtons::accept(held,1,false));
  assert(GXPointerButtons::accept(held,1,true));held=0;
  assert(!GXPointerButtons::accept(held,1,false));
