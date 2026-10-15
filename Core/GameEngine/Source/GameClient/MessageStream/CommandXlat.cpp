@@ -39,6 +39,7 @@
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/GXInputTrace.h"
+#include "Common/GXTabletControls.h"
 #include "Common/MessageStream.h"
 #include "Common/MiscAudio.h"
 #include "Common/MultiplayerSettings.h"

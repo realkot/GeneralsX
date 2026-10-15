@@ -518,7 +518,7 @@
     <string name="tablet_cursor_size">Cursor size</string>
     <string name="tablet_cursor_outline">High-contrast outline</string>
     <string name="tablet_cursor_outline_desc">Adds a dark outline to nontransparent cursor pixels.</string>
-    <string name="tablet_defaults">Restore r9 control defaults</string>
+    <string name="tablet_defaults">Restore control defaults</string>
     <string name="tablet_back">Back</string>
     <string name="tablet_save_error">Could not save settings. Check available storage.</string>
     <string name="tablet_no_log">No order log yet. Enable recording, restart the game and reproduce the issue.</string>

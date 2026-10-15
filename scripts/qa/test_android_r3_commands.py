@@ -12,6 +12,7 @@ def function(s,signature):
  while depth:depth+=(s[j]=='{')-(s[j]=='}');j+=1
  return s[start:j]
 def run(name,code):
+ code='namespace GXInputTrace { template<class... T> void record(T...) {} }\nnamespace GXTabletControls { struct Settings {int attackMove=1;}; Settings settings; const Settings &get(){return settings;} }\n'+code
  p=OUT/(name+'.cpp');p.write_text(code)
  subprocess.run(['g++','-std=c++17','-Werror=return-type','-I',str(args.sdl_include),str(p),'-o',str(OUT/name)],check=True)
  subprocess.run([str(OUT/name)],check=True)
@@ -98,6 +99,7 @@ int main(){
  Drawable a{&soldier},b{&worker},t{&target};Coord3D pos{10,20,30};CommandTranslator c;
  ui.selected={&a};assert(c.issueMoveToLocationCommand(&pos,nullptr,DO_COMMAND)==GameMessage::MSG_DO_ATTACKMOVETO);
  assert(stream.messages.back().pos.x==10);
+ GXTabletControls::settings.attackMove=0;assert(c.issueMoveToLocationCommand(&pos,nullptr,DO_COMMAND)==GameMessage::MSG_DO_MOVETO);GXTabletControls::settings.attackMove=1;
  ui.selected={&b};assert(c.issueMoveToLocationCommand(&pos,nullptr,DO_COMMAND)==GameMessage::MSG_DO_MOVETO);
  ui.selected={&a,&b};assert(gxDefaultAttackMove());AIGroup group;group.m_memberList={&soldier,&worker};group.groupAttackMoveToPosition(&pos,-1,0);assert(soldier.ai.attacks==1&&worker.ai.moves==1);
  ui.force=true;assert(c.issueMoveToLocationCommand(&pos,nullptr,DO_COMMAND)==GameMessage::MSG_DO_FORCEMOVETO);ui.force=false;

@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>
+#include <climits>
 #if defined(__ANDROID__)
 #include <unistd.h>
 #include "GXAndroidIdentity.h"
@@ -30,7 +31,7 @@ inline void parse(FILE *file, Settings &s) {
         char *eq=strchr(line,'='); if (!eq) continue;
         *eq++=0;
         errno=0; char *end=nullptr; long value=strtol(eq,&end,10);
-        if (errno || end==eq) continue;
+        if (errno || end==eq || value<INT_MIN || value>INT_MAX) continue;
         while (*end==' ' || *end=='\r' || *end=='\n' || *end=='\t') ++end;
         if (*end) continue;
         struct Field { const char *name; int *value; int low,high; };

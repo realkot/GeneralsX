@@ -17,21 +17,25 @@ code=r'''
 #include <cstdio>
 #include <cstdarg>
 #include <cmath>
+#include <cwchar>
+#include "GameClient/GXExtrasValues.h"
 using std::min;using std::max;using Bool=bool;using Int=int;using Real=float;using UnsignedInt=unsigned;using UnsignedByte=unsigned char;
 using NameKeyType=int;using WindowMsgData=uintptr_t;using WindowMsgHandledType=int;
-constexpr bool TRUE=true,FALSE=false;constexpr int NAMEKEY_INVALID=0,GWM_CREATE=1,GWM_DESTROY=2,GWM_INPUT_FOCUS=3,GBM_SELECTED=4,GWM_CHAR=5,KEY_ESC=27,KEY_STATE_UP=1,MSG_HANDLED=1,MSG_IGNORED=0;
+constexpr bool TRUE=true,FALSE=false;constexpr int NAMEKEY_INVALID=0,GWM_CREATE=1,GWM_DESTROY=2,GWM_INPUT_FOCUS=3,GBM_SELECTED=4,GWM_CHAR=5,KEY_ESC=27,KEY_STATE_UP=1,MSG_HANDLED=1,MSG_IGNORED=0,GEM_EDIT_DONE=99;
 #define BitIsSet(a,b) ((a)&(b))
 #define DEG_TO_RADF(a) ((a)*3.14159265f/180.f)
-struct AsciiString:std::string {using std::string::string;void format(const char*fmt,...){char b[100];va_list a;va_start(a,fmt);vsnprintf(b,sizeof(b),fmt,a);va_end(a);assign(b);}};
+struct AsciiString:std::string {using std::string::string;operator const char*()const{return c_str();}void format(const char*fmt,...){char b[100];va_list a;va_start(a,fmt);vsnprintf(b,sizeof(b),fmt,a);va_end(a);assign(b);}};
+struct UnicodeString:std::wstring{using std::wstring::wstring;const wchar_t*str()const{return c_str();}int getLength()const{return size();}void format(const wchar_t*fmt,int value){wchar_t b[32];swprintf(b,32,fmt,value);assign(b);}};
 int writes=0,destroyed=0,shutdowns=0;
 struct OptionPreferences:std::map<std::string,AsciiString>{void write(){++writes;}};
 struct WindowLayout;struct WinInstanceData{};
-struct GameWindow{int id=0,val=0;bool hasDraw=false;int winGetWindowId(){return id;}void winSetDrawFunc(void(*)(GameWindow*,WinInstanceData*)){hasDraw=true;}};
+struct GameWindow{UnicodeString text;int id=0,val=0;bool hasDraw=false;int winGetWindowId(){return id;}void winSetDrawFunc(void(*)(GameWindow*,WinInstanceData*)){hasDraw=true;}};
 struct NameKeys{std::map<std::string,int>ids;int nameToKey(const char*s){if(!ids.count(s))ids[s]=ids.size()+1;return ids[s];}}keys,*TheNameKeyGenerator=&keys;
 struct WM{
+ std::map<int,GameWindow> widgets;
  bool missing=false,noRoot=false;GameWindow options;GameWindow*extra=nullptr,*focus=nullptr;std::vector<GameWindow*>modals;
  WindowLayout*winCreateLayout(const char*);
- GameWindow*winGetWindowFromId(void*,int id){if(id==keys.nameToKey("OptionsMenu.wnd:OptionsMenuParent"))return &options;if(id==keys.nameToKey("ExtrasMenu.wnd:ExtrasMenuParent"))return extra;return nullptr;}
+ GameWindow*winGetWindowFromId(void*,int id){if(id==keys.nameToKey("OptionsMenu.wnd:OptionsMenuParent"))return &options;if(id==keys.nameToKey("ExtrasMenu.wnd:ExtrasMenuParent"))return extra;auto it=widgets.find(id);return it==widgets.end()?nullptr:&it->second;}
  void winSetModal(GameWindow*w){modals.push_back(w);}void winUnsetModal(GameWindow*w){assert(!modals.empty()&&modals.back()==w);modals.pop_back();}
  void winSetFocus(GameWindow*w){focus=w;}
 }wm,*TheWindowManager=&wm;
@@ -39,6 +43,7 @@ void gxExtrasBackdropDraw(GameWindow*,WinInstanceData*){}
 struct WindowLayout{GameWindow root;bool shown=false;void runInit(void*);void runShutdown(void*);void hide(bool b){shown=!b;}void bringForward(){}void destroyWindows(){wm.extra=nullptr;++destroyed;}};
 void deleteInstance(WindowLayout*p){delete p;}
 int GadgetSliderGetPosition(GameWindow*w){return w->val;}void GadgetSliderSetPosition(GameWindow*w,int v){w->val=v;}
+UnicodeString GadgetTextEntryGetText(GameWindow*w){return w->text;}void GadgetTextEntrySetText(GameWindow*w,UnicodeString t){w->text=t;}
 GameWindow maxSlider,minSlider,pitchSlider,scrollSlider,distanceSlider;
 static GameWindow *sliderMaxCameraHeight=nullptr,*sliderMinCameraHeight=nullptr,*sliderCameraPitch=nullptr,*sliderScrollSpeed=nullptr,*sliderDrawDistance=nullptr;
 static OptionPreferences *pref=nullptr;
@@ -59,6 +64,7 @@ void WindowLayout::runShutdown(void*){++shutdowns;ExtrasMenuShutdown(this,nullpt
 WindowLayout*WM::winCreateLayout(const char*name){assert(std::string(name)=="ExtrasMenu.wnd");if(missing)return nullptr;auto*l=new WindowLayout;extra=noRoot?nullptr:&l->root;return l;}
 '''
 code=code.replace('#include <map>', '#include <map>\n#include <vector>')
+code+='\n'+s[s.index('static Int s_exactLast'):s.index('//-------------------------------------------------------------------------------------------------\nvoid ExtrasMenuInit')]+'\n'
 for signature in ['void CloseExtrasMenu()', 'void OpenExtrasMenu(', 'void ExtrasMenuShutdown(', 'static void saveExtras()', 'static void setDefaults()', 'WindowMsgHandledType ExtrasMenuSystem(', 'WindowMsgHandledType ExtrasMenuInput(']:code+='\n'+function(signature)+'\n'
 code+=r'''
 void click(const char*name){GameWindow control;control.id=keys.nameToKey(name);ExtrasMenuSystem(wm.extra,GBM_SELECTED,(uintptr_t)&control,0);}
@@ -75,11 +81,23 @@ int main(){
  click("ExtrasMenu.wnd:ButtonAccept");assert(global.m_maxCameraHeight==900&&global.m_minCameraHeight==50&&global.m_cameraPitch==60&&global.m_keyboardScrollFactor==2&&global.m_terrainDrawDistanceScale==2);assert(view.pitches==1);
  OpenExtrasMenu(&draft);maxSlider.val=400;minSlider.val=300;saveExtras();assert(global.m_maxCameraHeight>=global.m_minCameraHeight);click("ExtrasMenu.wnd:ButtonDefaults");assert(maxSlider.val==2000&&minSlider.val==80);CloseExtrasMenu();
  const int oldDestroyed=destroyed;CloseExtrasMenu();assert(destroyed==oldDestroyed&&wm.modals.size()==1);
+ OpenExtrasMenu(&draft);
+ for(int i=0;i<5;i++){char key[80];snprintf(key,sizeof(key),"ExtrasMenu.wnd:Exact%dValue",i);int id=keys.nameToKey(key);wm.widgets[id].id=id;}
+ maxSlider.val=2000;gxSyncExactValues(TRUE);assert(gxExactWindow(0,"Value")->text==L"2000");
+ gxExactWindow(0,"Value")->text=L"3601";gxCommitExactValue(0);gxSyncExactValues();assert(maxSlider.val==3600&&gxExactWindow(0,"Value")->text==L"3600");
+ gxExactWindow(0,"Value")->text=L"-1";gxCommitExactValue(0);gxSyncExactValues();assert(maxSlider.val==3600);
+ gxExactWindow(1,"Value")->text=L"125";gxCommitExactValue(1);assert(minSlider.val==125);
+ maxSlider.val=400;gxSyncExactValues(TRUE);
+ int plusId=keys.nameToKey("ExtrasMenu.wnd:Exact0Plus");wm.widgets[plusId].id=plusId;
+ ExtrasMenuSystem(wm.extra,GBM_SELECTED,(uintptr_t)&wm.widgets[plusId],0);assert(maxSlider.val==440);
+ click("ExtrasMenu.wnd:CameraPreset3");assert(maxSlider.val==3600);
+ gxExactWindow(0,"Value")->text=L"803";ExtrasMenuSystem(wm.extra,GEM_EDIT_DONE,(uintptr_t)gxExactWindow(0,"Value"),0);assert(maxSlider.val==800);
+ const float savedHeight=global.m_maxCameraHeight;gxExactWindow(0,"Value")->text=L"1200";click("ExtrasMenu.wnd:ButtonBack");assert(global.m_maxCameraHeight==savedHeight);
  puts("PASS production Extras: missing layout, missing root, modal ownership, duplicate open, cancel, Escape, apply/draft persistence, bounds, defaults and scripted camera guard");
 }
 '''
 p=OUT/'r3_extras.cpp';p.write_text(code)
-subprocess.run(['g++','-std=c++17','-Werror=return-type',str(p),'-o',str(OUT/'r3_extras')],check=True)
+subprocess.run(['g++','-I',str(ROOT/'Core/GameEngine/Include'),'-std=c++17','-Werror=return-type',str(p),'-o',str(OUT/'r3_extras')],check=True)
 subprocess.run([str(OUT/'r3_extras')],check=True)
 asset=ROOT/'android/app/src/main/assets/gamedata/Window/ExtrasMenu.wnd';assert asset.read_bytes().startswith(b'FILE_VERSION = 2;')
 assert 'TheShell->push' not in function('void OpenExtrasMenu(')

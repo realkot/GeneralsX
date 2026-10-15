@@ -20,6 +20,8 @@ out.mkdir(parents=True, exist_ok=True)
 def put(path, text):
     p = out / path
     p.parent.mkdir(parents=True, exist_ok=True)
+    if path.endswith('_test.cpp'):
+        text='namespace GXInputTrace { template<class... T> void record(T...) {} }\n'+(ROOT/'Core/GameEngine/Include/Common/GXPointerButtons.h').read_text()+'\n'+text
     p.write_text(text, encoding='utf-8')
 
 def function(text, signature):
