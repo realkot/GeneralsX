@@ -20,3 +20,21 @@ APK cleanup and publication examples in AGENTS.md and inherited guides.
 
 Current baseline: r9, main `9e372c9`. Next candidate: r10, versionCode 10310,
 versionName `1.4.1-inputtest.20261016-r10`, test package unchanged.
+
+## Launcher APK update metadata
+
+Every future application release must attach `update.json` after uploading the APK.
+Use `scripts/update/publish-apk-update-metadata.py --tag TAG --package PACKAGE --code CODE --version VERSION --apk ASSET_NAME`
+with a short-lived `GH_TOKEN`/`GITHUB_TOKEN` in the environment, never in command text or Git.
+The metadata takes size and SHA-256 from GitHub's uploaded asset, is immutable once
+published, and must describe the verified APK manifest. It does not publish a new
+release, merge main, rebuild the APK or silently install anything on a device.
+The launcher only accepts assets from realkot/GeneralsX, higher versionCode,
+matching package and signing identity. Test prereleases are enabled by default
+only for the input-test package. Stable-channel selection excludes prereleases.
+Publish both Russian and English notes in the release body and as attachments.
+
+Source/resource snapshots live in the `resources` branch and the
+`android-dependencies-20261016` resource release. Do not label that release as a
+new game APK or mark it latest. See the external dependency audit for the owner-excluded
+GeneralsOnline datapack and the intentionally retained official toolchains/services.

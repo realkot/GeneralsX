@@ -255,7 +255,7 @@ public class SetupActivity extends Activity {
         refreshDiagnosticsSwitches();
         refreshUpdatesStatus();
         // Once per process, not on every return to this screen.
-        if (!sAutoUpdateCheckedThisProcess && UpdateManager.isAutoCheckEnabled(this)) {
+        if (!sAutoUpdateCheckedThisProcess && ApkUpdates.autoEnabled(this)) {
             sAutoUpdateCheckedThisProcess = true;
             runUpdateCheck(false);
         }
@@ -681,7 +681,19 @@ public class SetupActivity extends Activity {
     private boolean updateCheckRunning;
     private static boolean sAutoUpdateCheckedThisProcess;
 
+    // GeneralsX @feature Codex 16/10/2026 Whole APK updates from the owner's Releases.
+    private ApkUpdates apkUpdates;
+    private ApkUpdates apkUpdates() {
+        if (apkUpdates == null) apkUpdates = new ApkUpdates(this);
+        return apkUpdates;
+    }
     private void buildUpdatesSection(LinearLayout root) {
+        apkUpdates().build(root);
+        if(homeEngineSummary!=null)homeEngineSummary.setText(getString(R.string.launcher_build_value,UpdateManager.bundledEngineSeq(this)));
+    }
+    private void runUpdateCheck(boolean userAsked) { apkUpdates().check(userAsked); }
+
+    private void buildLegacyUpdatesSection(LinearLayout root) {
         LinearLayout content = UiKit.card(root);
         // GeneralsX @build Codex 14/10/2026 Make the isolated engine test explicit.
         if (BuildConfig.INPUT_TEST) {
@@ -796,7 +808,7 @@ public class SetupActivity extends Activity {
     }
 
     /** @param userAsked true for the button (always report), false for the silent start-up check. */
-    private void runUpdateCheck(boolean userAsked) {
+    private void runLegacyUpdateCheck(boolean userAsked) {
         if (updateCheckRunning) {
             return;
         }
@@ -2920,7 +2932,7 @@ public class SetupActivity extends Activity {
             org.json.JSONArray entries = new org.json.JSONArray(body.toString());
             for (int i = 0; i < entries.length(); i++) {
                 org.json.JSONObject entry = entries.getJSONObject(i);
-                if ("dir".equals(entry.optString("type"))) {
+                if ("dir".equals(entry.optString("type")) && entry.optString("name").matches("[a-z]{2,24}")) {
                     out.add(entry.optString("name"));
                 }
             }
@@ -2937,6 +2949,7 @@ public class SetupActivity extends Activity {
 
     /** @return null on success, else a short reason to put in front of the user. */
     private String downloadLanguagePack(String token, String gamePath) {
+        if (!token.matches("[a-z]{2,24}")) return "Invalid language";
         HttpURLConnection conn = null;
         // Written beside the real file and renamed at the end: a half-downloaded
         // generals.str in place would leave the game with a truncated string table, which

@@ -79,6 +79,7 @@
          with READ_EXTERNAL_STORAGE granted, File.listFiles() cannot see the game's .big files in
          shared storage. The flag only has an effect on Android 10; Android 11+ ignores it and
          uses MANAGE_EXTERNAL_STORAGE ("All files access") as before. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
         android:label="${appLabel}"
         android:icon="@mipmap/ic_launcher"

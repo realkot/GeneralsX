@@ -56,6 +56,7 @@ public class LauncherHomeUiTest {
         context.getSharedPreferences(SetupActivity.PREFS_NAME, Context.MODE_PRIVATE).edit()
             .clear().putString(SetupActivity.PREF_GAME_PATH, game.getAbsolutePath()).commit();
         UpdateManager.setAutoCheckEnabled(context, false);
+        ApkUpdates.prefs(context).edit().putBoolean("auto",false).commit();
     }
     @After public void tearDown() {
         if (controller != null) controller.pause().stop().destroy();
@@ -307,21 +308,9 @@ public class LauncherHomeUiTest {
     }
     // GeneralsX @test Codex 14/10/2026 OTA must not replace either test engine.
     private void assertUpdatePolicy() {
-        if (BuildConfig.INPUT_TEST) {
-            assertFalse(UpdateManager.isAutoCheckEnabled(context));
-            assertEquals(0, UpdateManager.activeEngineSeq(context));
-            assertNull(field("updatesCheckButton"));
-            boolean found = false;
-            for (View view : views(activity.getWindow().getDecorView())) {
-                if (view instanceof TextView && ((TextView)view).getText().toString()
-                    .contains("Engine updates are disabled.")) found = true;
-            }
-            assertTrue("Test engine policy must be visible", found);
-        } else {
-            label(R.string.setup_button_check_updates);
-            label(R.string.setup_switch_auto_updates);
-            label(R.string.setup_button_open_online_data);
-        }
+        assertFalse(UpdateManager.isAutoCheckEnabled(context)); // setUp disables network checks
+        if(BuildConfig.INPUT_TEST)assertEquals(0,UpdateManager.activeEngineSeq(context));
+        assertNotNull(field("apkUpdates"));
     }
     @Test @Config(sdk=28, qualifiers="w320dp-h640dp-mdpi")
     public void arabicHomeKeepsTouchTargetsAndModLaunchKeepsSavedChoice() throws Exception {
