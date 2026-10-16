@@ -7,13 +7,13 @@ permissions:
   # workflow level: pull_request (not pull_request_target) from a fork always
   # gets a read-only token from GitHub regardless of this block, and push/
   # workflow_dispatch on this repo both require write access to trigger anyway.
-  contents: write
+  contents: read
   pull-requests: read
   # GeneralsX @bugfix Android CI 18/07/2026 needed by the "Delete old
   # artifacts" cleanup step below (DELETE .../actions/artifacts/{id}) --
   # without this, that call 403s since an explicit permissions: block (this
   # one) drops every unlisted scope to none rather than defaulting to read.
-  actions: write
+  actions: read
 
 on:
   # GeneralsX @bugfix Android CI 01/08/2026 dropped the push: trigger that
@@ -26,21 +26,6 @@ on:
   # usage for zero benefit. pull_request/workflow_dispatch (manual runs,
   # including the "publish a Release" path) are unaffected and still work
   # exactly as before.
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'GeneralsMD/**'
-      - 'Core/**'
-      - 'Dependencies/**'
-      - 'cmake/**'
-      - 'android/**'
-      - 'scripts/build/android/**'
-      - 'Patches/**'
-      - 'CMakeLists.txt'
-      - 'CMakePresets.json'
-      - 'vcpkg.json'
-      - '.github/workflows/build-android.yml'
   workflow_dispatch:
     inputs:
       preset:
@@ -56,14 +41,6 @@ on:
       version_code:
         type: string
         description: "Override versionCode (must be higher than any build already installed on your device). Leave blank to use the committed default."
-        default: ""
-      create_release:
-        type: boolean
-        description: "Also publish a GitHub Release for this build (tag = v<version_name>). Requires version_name above to be set."
-        default: false
-      release_notes:
-        type: string
-        description: "Optional custom text for the top of the release description (auto-generated commit/PR notes are still appended below it)."
         default: ""
 
 jobs:
@@ -278,349 +255,58 @@ jobs:
       # and run #2 sailed straight past a fatal configure error into "success"
       # — exactly the pipeline-masking failure the porting playbook warns
       # about. The Verify step caught it; now the failing step reports itself.
-      - name: Configure CMake (Android)
-        run: |
-          set -o pipefail
-          mkdir -p logs
-          cmake --preset ${{ env.PRESET }} \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DANDROID_CI_BUILD_NUMBER=${{ github.run_number }} \
-            2>&1 | tee logs/configure_android.log
-
-      - name: Build z_generals (libmain.so) + DXVK d3d8/d3d9
-        run: |
-          set -o pipefail
-          mkdir -p logs
-          # ninja -k 0: keep going past failures so ONE run surfaces every
-          # cross-compile error in the 1.6M-LOC engine instead of one per
-          # round-trip; the exit code still fails the step when anything broke.
-          # main_hook/file_redirect_hook/gsl_alloc_hook/hook_impl
-          # (cmake/adrenotools.cmake): dlopen()'d by path at runtime, not a
-          # link-time dependency of z_generals, so a targeted build skips them
-          # unless named explicitly -- package-android-zh.sh's jniLibs staging
-          # requires all four to already exist.
-          cmake --build build/${{ env.PRESET }} --target z_generals dxvk_d3d8_install \
-            main_hook file_redirect_hook gsl_alloc_hook hook_impl -- -k 0 2>&1 | tee logs/build_android.log
-          ccache --show-stats
-
-      - name: Verify artifacts
-        run: |
-          set -euo pipefail
-          READELF="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-readelf | head -1)"
-          # GeneralsX @bugfix Android port 13/07/2026 - this step has
-          # intermittently failed "libmain.so is not AArch64" (builds #118,
-          # #127, #129) within milliseconds of ninja's own "Linking ...
-          # libmain.so" line, always on an otherwise-clean build (re-running
-          # the identical commit always passes). The broad `find ... -name
-          # libmain.so | head -1` this used to run has no ordering guarantee
-          # when the build dir accumulates more than one match across cached/
-          # incremental runs (ccache + vcpkg + DXVK build caches are all
-          # restored between runs) -- `head -1` can silently grab a stale or
-          # wrong-arch copy instead of the one ninja just linked. The target's
-          # own OUTPUT_NAME (GeneralsMD/Code/Main/CMakeLists.txt) makes the
-          # real path deterministic, so use it directly instead of searching.
-          GAME_LIB="build/${{ env.PRESET }}/GeneralsMD/Code/Main/libmain.so"
-          if [ ! -f "$GAME_LIB" ]; then echo "::error::libmain.so not found at $GAME_LIB"; exit 1; fi
-          # GeneralsX @bugfix Android port 31/07/2026 - the deterministic
-          # OUTPUT_NAME path above (13/07/2026 fix) stopped `head -1` from
-          # grabbing the wrong file, but the readelf check itself still
-          # failed twice in a row on two otherwise-clean reruns of the exact
-          # same commit (both with warm ccache/vcpkg/DXVK caches, both
-          # failing within ~25ms of this step starting) -- pointing at an
-          # I/O visibility race on the runner rather than a real wrong-arch
-          # binary: the prior step already exited 0, so the linker's writes
-          # should be complete, but the file's content isn't always visible
-          # to a process started microseconds later. Retry a few times with
-          # a short sleep before failing for real; a genuinely wrong-arch
-          # binary will still fail every attempt and correctly error out.
-          READELF_OK=0
-          for attempt in 1 2 3 4 5; do
-            if "$READELF" -h "$GAME_LIB" 2>/dev/null | grep -q AArch64; then
-              READELF_OK=1
-              break
-            fi
-            sleep 1
-          done
-          [ "$READELF_OK" = "1" ] || { echo "::error::libmain.so is not AArch64"; exit 1; }
-          for lib in libdxvk_d3d8.so libdxvk_d3d9.so; do
-            [ -f "build/${{ env.PRESET }}/$lib" ] || { echo "::error::$lib missing"; exit 1; }
-          done
-          strings "build/${{ env.PRESET }}/libdxvk_d3d9.so" | grep -q Sdl3WsiDriver || {
-            echo "::error::libdxvk_d3d9.so built without the SDL3 WSI (silent fallback)"; exit 1; }
-          echo "Artifacts verified: AArch64 libmain.so + DXVK with SDL3 WSI"
-
-      # GeneralsX @feature Android CI 06/09/2026 The strip step below is what
-      # keeps the APK at ~42MB instead of ~118MB, but it also destroys the one
-      # thing that made real device tombstones readable: several fixes in this
-      # port were found by resolving crash addresses against that exact build's
-      # unstripped libmain.so, and nothing in the pipeline kept a copy, so a
-      # released build's crash log can no longer be symbolized at all.
-      # Uploading the unstripped library is not an option -- it is ~282MB on
-      # its own and this repo's entire Actions storage quota is 0.5GB (see the
-      # retention comment on the APK upload below). A text symbol table costs a
-      # few MB instead, and address -> function+offset is what those
-      # investigations actually used. The program headers travel with it so the
-      # vaddr-vs-file-offset bias (the +0x1000 one, rediscovered by hand more
-      # than once) is written down next to the symbols it applies to.
-      - name: Collect symbol table (before stripping)
-        run: |
-          set -e
-          TOOLS="$(dirname "$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-nm | head -1)")"
-          LIB="build/${{ env.PRESET }}/GeneralsMD/Code/Main/libmain.so"
-          mkdir -p symbols
-          OUT="symbols/libmain-run${{ github.run_number }}.symbols.txt"
-          BUILD_ID="$(readelf -n "$LIB" 2>/dev/null | sed -n 's/.*Build ID: \([0-9a-f]*\).*/\1/p' | head -1)"
-          {
-            echo "# libmain.so symbols -- run ${{ github.run_number }}, commit ${{ github.sha }}"
-            echo "# Match this BuildID against the tombstone's before trusting any address."
-            # llvm-readelf --notes prints the note's header but not the build-id
-            # value itself, so pull it out with GNU readelf, which does.
-            echo "# BuildID: ${BUILD_ID:-UNKNOWN}"
-            "$TOOLS/llvm-readelf" --notes --program-headers "$LIB"
-            echo "# --- defined symbols: address size type name ---"
-            "$TOOLS/llvm-nm" --defined-only --numeric-sort --print-size --demangle "$LIB"
-          } > "$OUT"
-          # A table that came out empty (wrong path, or a library that was
-          # already stripped upstream of here) is worse than no table: it
-          # would ship attached to a Release looking authoritative. Say so.
-          SYMS=$("$TOOLS/llvm-nm" --defined-only "$LIB" 2>/dev/null | wc -l)
-          echo "Symbols captured: ${SYMS}"
-          if [ "${SYMS}" -lt 1000 ]; then
-            echo "::warning::libmain.so yielded only ${SYMS} symbols -- crash logs from this build will not symbolize."
-          fi
-          gzip -9 "$OUT"
-          ls -la symbols/
-
-      # GeneralsX @bugfix Android CI 06/08/2026 CI never stripped debug
-      # symbols, so every uploaded artifact/Release asset shipped a fully
-      # unstripped libmain.so (282MB on its own) straight into the APK --
-      # AGP's own stripReleaseDebugSymbols task fails silently on all of our
-      # custom-built libraries for an unrelated reason (see build.gradle),
-      # so nothing else in the pipeline ever did this either. The local dev
-      # loop (scripts/build/android/build-local-sandboxed.sh) already runs
-      # this exact llvm-strip pass and ships a ~48MB APK instead of the
-      # ~118MB one CI had been producing (confirmed against the v1.1.5
-      # release asset) -- port it here so public builds get the same win.
-      # libdxvk_d3d8.so/libdxvk_d3d9.so are deliberately excluded: stripping
-      # them crashes DXVK's draw path on real hardware (keepDebugSymbols in
-      # android/app/build.gradle has the full story).
-      - name: Strip debug symbols
-        run: |
-          STRIP="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-strip | head -1)"
-          for lib in "build/${{ env.PRESET }}/GeneralsMD/Code/Main/libmain.so" \
-                     "build/${{ env.PRESET }}/_deps/sdl3-build/libSDL3.so" \
-                     "build/${{ env.PRESET }}/_deps/sdl3_image-build/libSDL3_image.so" \
-                     "build/${{ env.PRESET }}/_deps/openal_soft-build/libopenal.so" \
-                     "build/${{ env.PRESET }}/libgamespy.so" \
-                     "build/${{ env.PRESET }}/_deps/adrenotools-build/libadrenotools.so" \
-                     "build/${{ env.PRESET }}/_deps/adrenotools-build/src/hook/libgsl_alloc_hook.so" \
-                     "build/${{ env.PRESET }}/_deps/adrenotools-build/src/hook/libhook_impl.so" \
-                     "build/${{ env.PRESET }}/_deps/adrenotools-build/src/hook/libmain_hook.so" \
-                     "build/${{ env.PRESET }}/_deps/adrenotools-build/src/hook/libfile_redirect_hook.so"; do
-            [ -f "$lib" ] && "$STRIP" --strip-unneeded "$lib"
-          done
-
-      - name: Set artifact version
-        id: artifact
-        run: |
-          # GeneralsX @feature Android port 08/07/2026 Version numbers are
-          # manually managed (android/app/build.gradle), not auto-bumped from
-          # the workflow run number anymore. A manual "Run workflow" dispatch
-          # can still override them for a one-off build via the version_name /
-          # version_code inputs above; a normal push build passes neither, so
-          # Gradle falls back to whatever is committed in build.gradle.
-          echo "version_code=${{ inputs.version_code || '' }}" >> "$GITHUB_OUTPUT"
-          echo "version_name=${{ inputs.version_name || '' }}" >> "$GITHUB_OUTPUT"
-          echo "apk_name=GeneralsXZH-android-run${{ github.run_number }}.apk" >> "$GITHUB_OUTPUT"
-
-      - name: Package APK
+      - name: Build dual-Hz test candidate
         env:
-          # scripts/build/android/package-android-zh.sh uses these to stage
-          # jniLibs/, the SDL3 Java glue, and fonts, then invokes Gradle. Same
-          # fixed debug.keystore every run (committed in android/app/) is what
-          # makes consecutive CI builds installable as updates over each other
-          # rather than requiring an uninstall, PROVIDED versionCode was bumped
-          # by hand (in build.gradle or via a manual-dispatch override) since
-          # the last build the user actually installed.
-          GX_ANDROID_STAGING: ${{ github.workspace }}/android-staging
-          GX_ANDROID_VERSION_CODE: ${{ steps.artifact.outputs.version_code }}
-          GX_ANDROID_VERSION_NAME: ${{ steps.artifact.outputs.version_name }}
-        run: |
-          ./scripts/build/android/package-android-zh.sh
-
-      - name: Locate APK
-        id: locate
-        run: |
-          APK="android/app/build/outputs/apk/debug/app-debug.apk"
-          if [ ! -f "$APK" ]; then echo "::error::APK not found at $APK"; exit 1; fi
-          cp "$APK" "${{ steps.artifact.outputs.apk_name }}"
-          echo "path=${{ steps.artifact.outputs.apk_name }}" >> "$GITHUB_OUTPUT"
-
-      # GeneralsX @bugfix Android CI 07/07/2026 A real device caught what CI
-      # missed: run #10's APK was missing libgamespy.so (a genuine DT_NEEDED
-      # of libmain.so, not an optional lib) and crashed at dlopen on launch —
-      # package-android-zh.sh only warned, and nothing checked the actual APK
-      # contents against what libmain.so declares it needs. Do that here:
-      # every non-system DT_NEEDED of libmain.so must be a real file inside
-      # the APK's lib/arm64-v8a/, or the build is not actually shippable.
-      - name: Verify APK contains every library libmain.so needs
+          GX_INPUT_TEST: '1'
+          GX_ANDROID_VERSION_CODE: ${{ inputs.version_code || '10311' }}
+          GX_ANDROID_VERSION_NAME: ${{ inputs.version_name || '1.4.2-inputtest.20261016-r11' }}
+          GX_KEEP_SYMBOLS_DIR: ${{ github.workspace }}/symbols
+          GX_CCACHE_MAX_SIZE: '2G'
+          CMAKE_BUILD_PARALLEL_LEVEL: '4'
+          VCPKG_MAX_CONCURRENCY: '4'
         run: |
           set -euo pipefail
-          READELF="$(ls "${ANDROID_NDK_HOME}"/toolchains/llvm/prebuilt/*/bin/llvm-readelf | head -1)"
-          APK="${{ steps.locate.outputs.path }}"
-          WORKDIR="$(mktemp -d)"
-          unzip -q "${APK}" 'lib/arm64-v8a/*' -d "${WORKDIR}"
-          echo "Packaged libraries:"
-          ls "${WORKDIR}/lib/arm64-v8a/"
-          NEEDED="$("${READELF}" -d "${WORKDIR}/lib/arm64-v8a/libmain.so" | grep NEEDED | sed -E 's/.*\[(.*)\]/\1/')"
-          missing=0
-          for lib in ${NEEDED}; do
-            case "${lib}" in
-              libc.so|libm.so|libdl.so|liblog.so|libandroid.so|libGLESv*|libEGL.so|libvulkan.so|libOpenSLES.so|libaaudio.so|libmediandk.so|libcamera2ndk.so|libjnigraphics.so|libnativewindow.so|libsync.so|libz.so)
-                continue ;;  # system libs every device provides via the NDK stable ABI (run
-                             # #11 caught libmediandk.so, pulled in by FFmpeg's MediaCodec
-                             # backend, missing from this allowlist — see docs/port/ANDROID_PORT.md)
-            esac
-            if [ ! -f "${WORKDIR}/lib/arm64-v8a/${lib}" ]; then
-              echo "::error::libmain.so needs '${lib}' at runtime but it is not packaged in the APK"
-              missing=1
-            fi
-          done
-          rm -rf "${WORKDIR}"
-          if [ "${missing}" -ne 0 ]; then
-            echo "::error::APK is missing required native libraries — it would crash with dlopen failed on any real device."
-            exit 1
-          fi
-          echo "OK: every DT_NEEDED of libmain.so is present in the APK."
+          mkdir -p logs
+          ./scripts/build/android/build-dual-hz.sh 2>&1 | tee logs/build_android.log
 
-      - name: Upload APK artifact
+      - name: Verify candidate package
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          TOOLS=/opt/android-sdk/build-tools/35.0.0
+          "$TOOLS/aapt" dump badging "$APK" | tee logs/apk-badging.txt
+          grep -q "package: name='com.generalsx.zerohour.inputtest'" logs/apk-badging.txt
+          grep -q "versionCode='${{ inputs.version_code || '10311' }}'" logs/apk-badging.txt
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee logs/apk-signing.txt
+          grep -q '644a3b0f8234c6ea8960ece9b55a161c00966b8dd522d2558d84883f4f77c48e' logs/apk-signing.txt
+          "$TOOLS/zipalign" -c 4 "$APK"
+          unzip -l "$APK" | tee logs/apk-files.txt
+          grep -q 'lib/arm64-v8a/libmain.so' logs/apk-files.txt
+          grep -q 'lib/arm64-v8a/libmain60.so' logs/apk-files.txt
+          cp "$APK" GeneralsZH-InputTest-20261016-r11.apk
+          sha256sum GeneralsZH-InputTest-20261016-r11.apk > SHA256SUMS.txt
+
+      - name: Upload r11 APK and checksum
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.artifact.outputs.apk_name }}
-          path: ${{ steps.locate.outputs.path }}
-          # GeneralsX @bugfix Android CI 18/07/2026 was 30: the free plan's
-          # Actions storage quota is 0.5 GB total and each APK is ~110 MB, so
-          # a single busy day of testing (this project pushes several builds
-          # an hour while chasing device-specific bugs) filled it to 90% on
-          # its own even with the "Delete old artifacts" cleanup step below.
-          # 7 days is still ample time for a tester to grab a build.
-          retention-days: 7
-
-      # Same 7 days as the APK above on purpose: the table is only useful while
-      # someone can still be running the build it came from, and the cleanup
-      # step below keeps just the newest run per branch anyway. Released builds
-      # do not rely on this copy -- their table is attached to the Release.
-      - name: Upload symbol table artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: android-symbols-run${{ github.run_number }}
-          path: symbols/
-          # GeneralsX @bugfix Android CI 19/09/2026 was 7, copied from the APK
-          # above -- but the quota argument there does not apply here: an APK is
-          # ~110 MB, this is a gzipped text symbol table of a few MB. Seven days
-          # is shorter than the round trip on a tester report, and that is not
-          # hypothetical: a crash reported on 19/09/2026 came from a build whose
-          # symbol bundle had already expired, so symbolizing it meant searching
-          # every historical APK committed under apk/ for one whose symbol table
-          # agreed with the log. Keep these for the full 90 days.
+          name: GeneralsZH-InputTest-20261016-r11
+          path: |
+            GeneralsZH-InputTest-20261016-r11.apk
+            SHA256SUMS.txt
+          if-no-files-found: error
           retention-days: 90
 
-      # GeneralsX @feature Android port 09/07/2026 Actions artifacts expire
-      # (30 days) and require a GitHub login to download -- not a real "here,
-      # everyone download this" link. Manual dispatch with create_release=true
-      # publishes an actual GitHub Release with the APK attached instead,
-      # tagged from version_name (set alongside it above) so the release name
-      # always matches what's baked into the APK's own versionName.
-      - name: Create GitHub Release
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.create_release }}
-        run: |
-          set -euo pipefail
-          if [ -z "${{ inputs.version_name }}" ]; then
-            echo "::error::create_release requires version_name to be set (used as the release tag)."
-            exit 1
-          fi
-
-      - name: Publish GitHub Release
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.create_release }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ inputs.version_name }}
-          name: v${{ inputs.version_name }}
-          body: ${{ inputs.release_notes }}
-          files: |
-            ${{ steps.locate.outputs.path }}
-            symbols/libmain-run${{ github.run_number }}.symbols.txt.gz
-          generate_release_notes: true
-          make_latest: true
-
-      - name: Collect dependency build logs for diagnosis
-        if: always()
-        run: |
-          mkdir -p logs
-          # vcpkg writes the real failure details one level below the summary
-          # that lands in configure_android.log — pull them into the artifact.
-          cp build/${{ env.PRESET }}/vcpkg-manifest-install.log logs/ 2>/dev/null || true
-          if [ -d /opt/vcpkg/buildtrees ]; then
-            find /opt/vcpkg/buildtrees -maxdepth 2 -name "*.log" -newer .git -exec cp {} logs/ \; 2>/dev/null || true
-          fi
-          # DXVK meson configure log, when that stage was reached
-          cp build/${{ env.PRESET }}/_deps/dxvk-build-android/meson-logs/meson-log.txt logs/dxvk-meson-log.txt 2>/dev/null || true
-          ls -la logs/ || true
-
-      - name: Upload build logs
+      - name: Upload symbols and build logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: android-build-logs-${{ github.run_number }}
-          path: logs/
-          retention-days: 7
+          name: android-r11-diagnostics-${{ github.run_number }}
+          path: |
+            logs/
+            symbols/
           if-no-files-found: ignore
+          retention-days: 90
 
-      # GeneralsX @feature Android CI 18/07/2026 Actions storage is a shared
-      # 0.5 GB account-wide quota (free plan), not per-repo or per-branch --
-      # a day of iterating on device-specific bugs (several APK builds/hour,
-      # ~110 MB each) fills it well before the retention-days above ever
-      # kick in on their own. First pass scoped cleanup only to same-branch
-      # artifacts and left main/other branches' old builds untouched, which
-      # turned out to be most of the remaining quota (main alone had ~30
-      # same-day runs with live artifacts). Sweep the WHOLE repository now:
-      # for every branch this workflow has ever run on, keep only its most
-      # recent run's artifacts and delete every other run's, regardless of
-      # which branch triggered the current run. gh/GITHUB_TOKEN are
-      # preinstalled/preauthenticated on every GitHub-hosted runner;
-      # `actions: write` above is what authorizes the delete call itself.
-      # Best-effort throughout: a delete failing (already expired, already
-      # deleted by a concurrent run) must not fail the build.
-      - name: Delete superseded artifacts across all branches
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          declare -A latest_run
-
-          while IFS=$'\t' read -r branch run_id; do
-            [ -z "${branch}" ] && continue
-            if [ -z "${latest_run[$branch]:-}" ] || [ "${run_id}" -gt "${latest_run[$branch]}" ]; then
-              latest_run[$branch]="${run_id}"
-            fi
-          done < <(gh api "repos/${{ github.repository }}/actions/artifacts" --paginate \
-            --jq '.artifacts[] | [(.workflow_run.head_branch // ""), .workflow_run.id] | @tsv')
-
-          gh api "repos/${{ github.repository }}/actions/artifacts" --paginate \
-            --jq '.artifacts[] | [(.workflow_run.head_branch // ""), .workflow_run.id, .id] | @tsv' \
-          | while IFS=$'\t' read -r branch run_id artifact_id; do
-              [ -z "${branch}" ] && continue
-              if [ "${run_id}" != "${latest_run[$branch]:-}" ]; then
-                echo "Deleting old artifact ${artifact_id} (branch ${branch}, run ${run_id}, latest for that branch is ${latest_run[$branch]})"
-                gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/${artifact_id}" || true
-              fi
-            done
-
-      # Save caches even when the job failed (see the restore steps above for
-      # why plain actions/cache can't do this). Guard each save so a run that
-      # restored an exact-key hit doesn't fail trying to re-save it.
       - name: Save Android SDK cache
         if: always() && steps.cache-android-sdk.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5

@@ -82,8 +82,8 @@ android {
         // already on your device.
         // Scheme: versionCode = major*10000 + minor*100 + patch, so the
         // number always sorts the same way as versionName (1.2.0 -> 10200).
-        versionCode (project.hasProperty('androidVersionCode') ? (project.androidVersionCode as Integer) : (inputTest ? 10310 : 10300))
-        versionName (project.hasProperty('androidVersionName') ? project.androidVersionName : (inputTest ? '1.4.1-inputtest.20261016-r10' : '1.3.0'))
+        versionCode (project.hasProperty('androidVersionCode') ? (project.androidVersionCode as Integer) : (inputTest ? 10311 : 10300))
+        versionName (project.hasProperty('androidVersionName') ? project.androidVersionName : (inputTest ? '1.4.2-inputtest.20261016-r11' : '1.3.0'))
         ndk {
             abiFilters 'arm64-v8a'
         }
