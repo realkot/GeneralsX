@@ -1,0 +1,18 @@
+{
+  "sha256": "88211b2737ed905289e6d2d98c053b71edd71e2be4464892ab5ab6ce4079db9e",
+  "bytes": 87179260,
+  "sourceCommit": "12dd0334f5dd3edb1f2d7a7984551a85ddda5d8a",
+  "versionCode": 10312,
+  "versionName": "1.4.3-inputtest.20261017-r12",
+  "package": "com.generalsx.zerohour.inputtest",
+  "status": "awaiting_owner_test",
+  "ownerApproved": false,
+  "build": "local WSL dual-Hz",
+  "tests": {
+    "tests": 55,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "deviceValidation": "MuMu ADB unavailable; physical tablet and system installer flow pending"
+}

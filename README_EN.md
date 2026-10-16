@@ -2,9 +2,9 @@
 
 **Your familiar Generals Zero Hour, with controls tailored to an Android tablet.** Mouse and keyboard, quick army selection, a flexible camera and a HUD that leaves more room for the battle.
 
-**[Download r11](https://github.com/realkot/GeneralsX/releases/tag/inputtest-20261016-r11)** · [All versions](https://github.com/realkot/GeneralsX/releases) · [Русский](README.md) · [Changelog](CHANGELOG_EN.md)
+**[Download r12](https://github.com/realkot/GeneralsX/releases/tag/inputtest-20261017-r12)** · [All versions](https://github.com/realkot/GeneralsX/releases) · [Русский](README.md) · [Changelog](CHANGELOG_EN.md)
 
-Android 9+ · ARM64 · separate package `com.generalsx.zerohour.inputtest`. **Original installed Zero Hour game data is required separately.** r11 is a test prerelease; main game code remains based on r9 until confirmed testing.
+Android 9+ · ARM64 · separate package `com.generalsx.zerohour.inputtest`. **Original installed Zero Hour game data is required separately.** r12 is a test prerelease; main game code remains based on r9 until confirmed testing.
 
 ![Tablet gameplay: right-aligned HUD and army selection on the left](docs/images/realkot/battle-user.jpg)
 
@@ -26,10 +26,41 @@ Launcher → wrench → **Interface → Tablet controls**. Preferences save auto
 | ![Tablet settings](docs/images/realkot/tablet-controls-user.jpg) | ![Exact Extras values](docs/images/realkot/extras-user.jpg) |
 
 <details>
-<summary>Launcher interface</summary>
+<summary>Launcher and game gallery</summary>
 
-![Launcher interface](docs/images/realkot/launcher-interface-user.jpg)
+**Home**
 
+![Home](docs/images/realkot/launcher-home-user.jpg)
+
+**Interface**
+
+![Interface](docs/images/realkot/launcher-interface-user.jpg)
+
+**Mods**
+
+![Mods](docs/images/realkot/mods-user.jpg)
+
+**Graphics**
+
+![Graphics](docs/images/realkot/graphics-user.jpg)
+
+**Tools**
+
+![Tools](docs/images/realkot/tools-user.jpg)
+
+**Game main menu**
+
+![Game main menu](docs/images/realkot/main-menu-user.jpg)
+
+**Game options**
+
+![Game options](docs/images/realkot/options-user.jpg)
+
+**Groups 0–9 with army buttons hidden**
+
+![Groups 0–9 with army buttons hidden](docs/images/realkot/battle-groups-user.jpg)
+
+Screenshots supplied by the owner before launcher translation completion.
 </details>
 
 ## Install and update
@@ -39,7 +70,7 @@ Launcher → wrench → **Interface → Tablet controls**. Preferences save auto
 3. Choose a graphics mode, UI scale and controls, then launch. Both 30/60 Hz engines are available; this is simulation frequency, not a promise of corresponding rendered FPS.
 4. Install subsequent test APKs over the same package with the same signing identity. Back up important saves and settings before replacing versions. To downgrade test APKs without deleting data, use **ADB `install -r -d`** — [instructions and Windows helper](docs/HOWTO/TEST_APK_ROLLBACK.md). Android’s normal installer does not allow version downgrades.
 
-**In development after r11:** launcher-based APK updates from `realkot/GeneralsX`, stable/test channels, changelog and package, signature and SHA-256 checks. The published r11 does not include this feature yet.
+**New in r12:** launcher update checks from this repository, stable/test channel selection, release notes and APK package, signature and SHA-256 verification. Installation requires user confirmation in Android. Language packs and the used Android resources are hosted in our repository; GeneralsOnline and official tools keep their existing sources. Russian mod-manager translation is completed.
 
 ## Status and attribution
 

@@ -1,7 +1,5 @@
 # Owner release policy
 
-Documentation-only updates to main do not imply acceptance or merging of a test release. New updater/build helpers are currently on `codex/project-docs-and-owned-updates`, pending owner-tested code integration.
-
 Effective 16 October 2026; this explicit owner instruction supersedes older branch,
 APK cleanup and publication examples in AGENTS.md and inherited guides.
 
@@ -20,9 +18,9 @@ APK cleanup and publication examples in AGENTS.md and inherited guides.
   switch where applicable. Do not rewrite published history or reuse a release tag.
 - Do not dispatch GitHub Actions. Preserve upstream licenses and attribution.
 
-Current baseline: r9, main `9e372c9`. Latest published candidate: r11, versionCode 10311,
-versionName `1.4.2-inputtest.20261016-r11`, test package unchanged.
-The APK updater and owner-resource migration are newer source changes, not included in r11.
+Current accepted application baseline: r9. Documentation-only main updates do not accept application code.
+Latest candidate: r12, versionCode 10312, versionName `1.4.3-inputtest.20261017-r12`, test package unchanged.
+r12 includes the APK updater and owner-resource migration and awaits explicit owner testing.
 
 ## Launcher APK update metadata
 

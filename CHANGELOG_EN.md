@@ -2,6 +2,15 @@
 
 Compared with koreazolfakar-droid main (`3793ab15`) and MYSOREZ main (`576e2265`). The former is the direct baseline; selected parent-branch improvements retain their original attribution.
 
+
+## Test candidates r10–r12
+
+- **r12:** in-launcher APK updates with channels and integrity/signature checks; owner-hosted language packs and Android dependency resources; completed Russian mod-manager translation; data-preserving ADB rollback instructions/helper; refreshed RU/EN screenshot gallery.
+- **r11:** immediate Extras slider-to-number synchronisation and prevention of stale values being applied.
+- **r10:** army-button size, width, background, position, visibility and caption fitting; 100–250% cursor and outline; attack-move toggle and order logging; exact camera input, minus/plus controls and presets.
+
+These are test candidates. Main game code remains based on accepted r9 pending explicit owner acceptance. No GeneralsOnline, graphics or AI changes in r12. [Full r12 changelog](docs/releases/inputtest-20261017-r12/CHANGELOG_EN.md).
+
 ## Current r9
 
 - Army selectors: screen/map/planes/helicopters; ground combat cycles screen → map; groups 0–9 through the plus toggle.

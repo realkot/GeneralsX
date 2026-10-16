@@ -2,9 +2,9 @@
 
 **Любимые Generals Zero Hour — с управлением, настроенным под Android-планшет.** Мышь и клавиатура, быстрый выбор армии, удобная камера и панель, которая оставляет больше места для боя.
 
-**[Скачать r11](https://github.com/realkot/GeneralsX/releases/tag/inputtest-20261016-r11)** · [Все версии](https://github.com/realkot/GeneralsX/releases) · [English](README_EN.md) · [История изменений](CHANGELOG_RU.md)
+**[Скачать r12](https://github.com/realkot/GeneralsX/releases/tag/inputtest-20261017-r12)** · [Все версии](https://github.com/realkot/GeneralsX/releases) · [English](README_EN.md) · [История изменений](CHANGELOG_RU.md)
 
-Android 9+ · ARM64 · отдельный пакет `com.generalsx.zerohour.inputtest`. **Оригинальные данные установленной Zero Hour нужны отдельно.** r11 — тестовый prerelease; код main остаётся на основе r9 до подтверждённого теста.
+Android 9+ · ARM64 · отдельный пакет `com.generalsx.zerohour.inputtest`. **Оригинальные данные установленной Zero Hour нужны отдельно.** r12 — тестовый prerelease; код main остаётся на основе r9 до подтверждённого теста.
 
 ![Бой на планшете: панель справа, выбор армии слева](docs/images/realkot/battle-user.jpg)
 
@@ -26,10 +26,41 @@ Android 9+ · ARM64 · отдельный пакет `com.generalsx.zerohour.inp
 | ![Настройки управления](docs/images/realkot/tablet-controls-user.jpg) | ![Точные значения Extras](docs/images/realkot/extras-user.jpg) |
 
 <details>
-<summary>Интерфейс лаунчера</summary>
+<summary>Галерея лаунчера и игры</summary>
 
-![Интерфейс лаунчера](docs/images/realkot/launcher-interface-user.jpg)
+**Главная страница**
 
+![Главная страница](docs/images/realkot/launcher-home-user.jpg)
+
+**Интерфейс**
+
+![Интерфейс](docs/images/realkot/launcher-interface-user.jpg)
+
+**Моды**
+
+![Моды](docs/images/realkot/mods-user.jpg)
+
+**Графика**
+
+![Графика](docs/images/realkot/graphics-user.jpg)
+
+**Инструменты**
+
+![Инструменты](docs/images/realkot/tools-user.jpg)
+
+**Главное меню игры**
+
+![Главное меню игры](docs/images/realkot/main-menu-user.jpg)
+
+**Настройки игры**
+
+![Настройки игры](docs/images/realkot/options-user.jpg)
+
+**Группы 0–9 со скрытыми кнопками армии**
+
+![Группы 0–9 со скрытыми кнопками армии](docs/images/realkot/battle-groups-user.jpg)
+
+Снимки предоставлены пользователем до завершения перевода лаунчера.
 </details>
 
 ## Установка и обновление
@@ -39,7 +70,7 @@ Android 9+ · ARM64 · отдельный пакет `com.generalsx.zerohour.inp
 3. Выберите графический режим, масштаб интерфейса и управление, затем запустите игру. Доступны движки 30/60 Гц; это частота симуляции, а не обещание соответствующего FPS.
 4. Следующие тестовые APK устанавливайте поверх того же пакета с сохранением подписи. Перед заменой версии сохраните важные сохранения и настройки. Для отката тестовых APK без удаления данных используйте **ADB `install -r -d`** — [инструкция и скрипт Windows](docs/HOWTO/TEST_APK_ROLLBACK.md). Обычный установщик Android понижение версии не разрешает.
 
-**В разработке после r11:** проверка и установка новых APK из `realkot/GeneralsX` прямо в лаунчере; стабильный/тестовый канал, changelog и проверка пакета, подписи и SHA-256. В опубликованный r11 эта функция ещё не входит.
+**Новое в r12:** проверка обновлений из этого репозитория в лаунчере, выбор стабильного/тестового канала, changelog и проверка APK по пакету, подписи и SHA-256. Установку подтверждает пользователь в Android. Языковые пакеты и используемые Android-ресурсы размещены в нашем репозитории; GeneralsOnline и официальные инструменты остаются на прежних источниках. Дополнен русский перевод раздела модов.
 
 ## Статус и происхождение
 
