@@ -377,6 +377,15 @@ WindowMsgHandledType ExtrasMenuSystem(GameWindow *window, UnsignedInt msg,
 			return MSG_HANDLED;
 		}
 
+        // Extras is an owned modal, not a shell layout: its periodic update is
+        // not guaranteed. Slider input must refresh the draft before Apply reads it.
+        case GSM_SLIDER_TRACK:
+            for(Int i=0;i<5;++i)if((GameWindow*)mData1==gxExactSlider(i)) {
+                s_exactLast[i]=-1;
+                gxSyncExactValues();return MSG_HANDLED;
+            }
+            break;
+
         case GEM_EDIT_DONE:
             for(Int i=0;i<5;++i)if((GameWindow*)mData1==gxExactWindow(i,"Value")) {
                 gxCommitExactValue(i);gxSyncExactValues();return MSG_HANDLED;

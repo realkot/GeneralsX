@@ -21,7 +21,7 @@ code=r'''
 #include "GameClient/GXExtrasValues.h"
 using std::min;using std::max;using Bool=bool;using Int=int;using Real=float;using UnsignedInt=unsigned;using UnsignedByte=unsigned char;
 using NameKeyType=int;using WindowMsgData=uintptr_t;using WindowMsgHandledType=int;
-constexpr bool TRUE=true,FALSE=false;constexpr int NAMEKEY_INVALID=0,GWM_CREATE=1,GWM_DESTROY=2,GWM_INPUT_FOCUS=3,GBM_SELECTED=4,GWM_CHAR=5,KEY_ESC=27,KEY_STATE_UP=1,MSG_HANDLED=1,MSG_IGNORED=0,GEM_EDIT_DONE=99;
+constexpr bool TRUE=true,FALSE=false;constexpr int NAMEKEY_INVALID=0,GWM_CREATE=1,GWM_DESTROY=2,GWM_INPUT_FOCUS=3,GBM_SELECTED=4,GWM_CHAR=5,KEY_ESC=27,KEY_STATE_UP=1,MSG_HANDLED=1,MSG_IGNORED=0,GEM_EDIT_DONE=99,GSM_SLIDER_TRACK=100;
 #define BitIsSet(a,b) ((a)&(b))
 #define DEG_TO_RADF(a) ((a)*3.14159265f/180.f)
 struct AsciiString:std::string {using std::string::string;operator const char*()const{return c_str();}void format(const char*fmt,...){char b[100];va_list a;va_start(a,fmt);vsnprintf(b,sizeof(b),fmt,a);va_end(a);assign(b);}};
@@ -84,6 +84,20 @@ int main(){
  OpenExtrasMenu(&draft);
  for(int i=0;i<5;i++){char key[80];snprintf(key,sizeof(key),"ExtrasMenu.wnd:Exact%dValue",i);int id=keys.nameToKey(key);wm.widgets[id].id=id;}
  maxSlider.val=2000;gxSyncExactValues(TRUE);assert(gxExactWindow(0,"Value")->text==L"2000");
+ // Exercise owner notifications directly, with no ExtrasMenuUpdate/frame tick.
+ for(int i=0;i<5;++i){
+   GameWindow*slider=gxExactSlider(i);int value=s_exactMin[i]+(i==0?400:7);
+   slider->val=value;ExtrasMenuSystem(wm.extra,GSM_SLIDER_TRACK,(uintptr_t)slider,value);
+   UnicodeString expected;expected.format(L"%d",value);
+   assert(gxExactWindow(i,"Value")->text==expected);
+ }
+ // A same-position click refreshes this field, without erasing another draft.
+ gxExactWindow(0,"Value")->text=L"9999";gxExactWindow(1,"Value")->text=L"125";
+ ExtrasMenuSystem(wm.extra,GSM_SLIDER_TRACK,(uintptr_t)&maxSlider,maxSlider.val);
+ assert(gxExactWindow(0,"Value")->text==L"800"&&gxExactWindow(1,"Value")->text==L"125");
+ maxSlider.val=1600;ExtrasMenuSystem(wm.extra,GSM_SLIDER_TRACK,(uintptr_t)&maxSlider,1600);
+ click("ExtrasMenu.wnd:ButtonAccept");assert(global.m_maxCameraHeight==400&&draft["MaxCameraHeight"]=="400");
+ OpenExtrasMenu(&draft);gxSyncExactValues(TRUE);
  gxExactWindow(0,"Value")->text=L"3601";gxCommitExactValue(0);gxSyncExactValues();assert(maxSlider.val==3600&&gxExactWindow(0,"Value")->text==L"3600");
  gxExactWindow(0,"Value")->text=L"-1";gxCommitExactValue(0);gxSyncExactValues();assert(maxSlider.val==3600);
  gxExactWindow(1,"Value")->text=L"125";gxCommitExactValue(1);assert(minSlider.val==125);
@@ -93,7 +107,7 @@ int main(){
  click("ExtrasMenu.wnd:CameraPreset3");assert(maxSlider.val==3600);
  gxExactWindow(0,"Value")->text=L"803";ExtrasMenuSystem(wm.extra,GEM_EDIT_DONE,(uintptr_t)gxExactWindow(0,"Value"),0);assert(maxSlider.val==800);
  const float savedHeight=global.m_maxCameraHeight;gxExactWindow(0,"Value")->text=L"1200";click("ExtrasMenu.wnd:ButtonBack");assert(global.m_maxCameraHeight==savedHeight);
- puts("PASS production Extras: missing layout, missing root, modal ownership, duplicate open, cancel, Escape, apply/draft persistence, bounds, defaults and scripted camera guard");
+ puts("PASS production Extras: missing layout, missing root, modal ownership, duplicate open, cancel, Escape, apply/draft persistence, bounds, defaults, slider-to-field events/immediate Apply and scripted camera guard");
 }
 '''
 p=OUT/'r3_extras.cpp';p.write_text(code)
