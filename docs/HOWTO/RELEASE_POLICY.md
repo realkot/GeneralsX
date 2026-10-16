@@ -18,8 +18,9 @@ APK cleanup and publication examples in AGENTS.md and inherited guides.
   switch where applicable. Do not rewrite published history or reuse a release tag.
 - Do not dispatch GitHub Actions. Preserve upstream licenses and attribution.
 
-Current baseline: r9, main `9e372c9`. Next candidate: r10, versionCode 10310,
-versionName `1.4.1-inputtest.20261016-r10`, test package unchanged.
+Current baseline: r9, main `9e372c9`. Latest published candidate: r11, versionCode 10311,
+versionName `1.4.2-inputtest.20261016-r11`, test package unchanged.
+The APK updater and owner-resource migration are newer source changes, not included in r11.
 
 ## Launcher APK update metadata
 

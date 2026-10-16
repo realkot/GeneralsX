@@ -121,8 +121,12 @@ final class ApkUpdates {
             try {
                 if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("Update directory unavailable");
                 if(apk.isFile()) {
-                    verify(activity,apk,c);
-                    activity.runOnUiThread(()->{busy=false;if(alive())install(apk);});return;
+                    try {
+                        verify(activity,apk,c);
+                        activity.runOnUiThread(()->{busy=false;if(alive())install(apk);});return;
+                    } catch(Exception invalidCache) {
+                        java.nio.file.Files.move(apk.toPath(),new File(dir,name+".rejected-"+System.currentTimeMillis()).toPath());
+                    }
                 }
                 if(progress!=null)activity.runOnUiThread(()->{progress.setProgress(0);progress.setVisibility(android.view.View.VISIBLE);});
                 HttpURLConnection conn=open(c.url);

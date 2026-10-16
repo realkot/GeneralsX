@@ -15,9 +15,9 @@
 [/list]
 
 [spoiler=Скриншоты]
-[img]https://raw.githubusercontent.com/realkot/GeneralsX/codex/project-docs-and-owned-updates/docs/images/realkot/battle-user.jpg[/img]
-[img]https://raw.githubusercontent.com/realkot/GeneralsX/codex/project-docs-and-owned-updates/docs/images/realkot/tablet-controls-user.jpg[/img]
-[img]https://raw.githubusercontent.com/realkot/GeneralsX/codex/project-docs-and-owned-updates/docs/images/realkot/extras-user.jpg[/img]
+[img]https://raw.githubusercontent.com/realkot/GeneralsX/9ddae6043b10fda8bc4475fef1eb9b22bb79f9cc/docs/images/realkot/battle-user.jpg[/img]
+[img]https://raw.githubusercontent.com/realkot/GeneralsX/9ddae6043b10fda8bc4475fef1eb9b22bb79f9cc/docs/images/realkot/tablet-controls-user.jpg[/img]
+[img]https://raw.githubusercontent.com/realkot/GeneralsX/9ddae6043b10fda8bc4475fef1eb9b22bb79f9cc/docs/images/realkot/extras-user.jpg[/img]
 [/spoiler]
 
 [b]Установка[/b]
