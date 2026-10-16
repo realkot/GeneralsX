@@ -32,6 +32,12 @@ if not (dxvk/'meson.build').is_file():
     if dxvk.exists() and any(dxvk.iterdir()):raise SystemExit('Nonempty DXVK directory preserved; inspect before staging')
     shutil.copytree(dest/'sources/DXVK',dxvk,dirs_exist_ok=True)
     subprocess.run(['git','init','--quiet',str(dxvk)],check=True)
+# GeneralsX @bugfix Codex 17/10/2026 Preserve legacy CompLibHeader include paths
+# with the flat LZHL mirror without changing compression sources or archive bytes.
+lzhl_alias=dest/'sources/CompLibHeader'
+lzhl_source=dest/'sources/LZHL'
+if not lzhl_alias.exists():lzhl_alias.symlink_to(lzhl_source,target_is_directory=True)
+if lzhl_alias.resolve()!=lzhl_source.resolve():raise SystemExit('Conflicting LZHL include alias preserved for inspection')
 cmake=dest/'sources.cmake'
 cmake.write_text('\n'.join('set(FETCHCONTENT_SOURCE_DIR_'+row['name']+' "'+(dest/row['sourcePath']).as_posix()+'" CACHE PATH "Owned mirror" FORCE)' for row in manifest['sources'] if row['name']!='DXVK')+'\n')
 fetch=dest/'fetchcontent';fetch.mkdir(exist_ok=True)
