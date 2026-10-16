@@ -37,7 +37,7 @@ Launcher → wrench → **Interface → Tablet controls**. Preferences save auto
 1. Download the APK from [Releases](https://github.com/realkot/GeneralsX/releases), install it and grant the required permissions.
 2. Select your Zero Hour game-data folder in the launcher. The original game is not included in the APK.
 3. Choose a graphics mode, UI scale and controls, then launch. Both 30/60 Hz engines are available; this is simulation frequency, not a promise of corresponding rendered FPS.
-4. Install subsequent test APKs over the same package with the same signing identity. Back up important saves and settings before replacing versions; Android may reject a lower versionCode.
+4. Install subsequent test APKs over the same package with the same signing identity. Back up important saves and settings before replacing versions; To downgrade test APKs without deleting data, use **ADB `install -r -d`** — [instructions and Windows helper](docs/HOWTO/TEST_APK_ROLLBACK.md). Android’s normal installer does not allow version downgrades.
 
 **In development after r11:** launcher-based APK updates from `realkot/GeneralsX`, stable/test channels, changelog and package, signature and SHA-256 checks. The published r11 does not include this feature yet.
 

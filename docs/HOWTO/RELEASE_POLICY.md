@@ -39,3 +39,13 @@ Source/resource snapshots live in the `resources` branch and the
 `android-dependencies-20261016` resource release. Do not label that release as a
 new game APK or mark it latest. See the external dependency audit for the owner-excluded
 GeneralsOnline datapack and the intentionally retained official toolchains/services.
+
+## Test APK downgrades
+
+Keep input-test debug APKs debuggable and signed with the same existing identity.
+Testers can explicitly downgrade with `adb install -r -d` without uninstall/data
+clearing, using `scripts/update/install-test-apk.ps1`. See TEST_APK_ROLLBACK.md.
+Do not fake higher versionCodes for old binaries or weaken the automatic updater
+to offer downgrades that Android's normal installer will reject. Publication still
+requires a higher unique versionCode; this does not prevent explicit ADB testing
+of a previously published lower version.

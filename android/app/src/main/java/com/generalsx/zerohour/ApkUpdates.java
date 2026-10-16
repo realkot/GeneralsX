@@ -51,6 +51,11 @@ final class ApkUpdates {
         auto.setChecked(autoEnabled(activity));auto.setOnCheckedChangeListener((b,on)->prefs(activity).edit().putBoolean("auto",on).apply());
         androidx.appcompat.widget.SwitchCompat tests=UiKit.switchRow(card,t("Include test prereleases","Включать тестовые prerelease"),t("Only updates matching the installed package are offered.","Предлагаются только обновления установленного пакета."));
         tests.setChecked(prefs(activity).getBoolean("tests",BuildConfig.INPUT_TEST));tests.setOnCheckedChangeListener((b,on)->prefs(activity).edit().putBoolean("tests",on).apply());
+        if(BuildConfig.INPUT_TEST)UiKit.button(card,UiKit.BTN_TONAL,0,t("Test version rollback","Откат тестовой версии"),()->
+            new AlertDialog.Builder(activity).setTitle(t("Rollback without clearing data","Откат без удаления данных"))
+                .setMessage(t("Android's normal installer blocks version downgrades. With USB or wireless debugging, use a PC: adb install -r -d older.apk. Our test APKs use the same package and signing key. Do not uninstall the app. The launcher cannot grant itself ADB permissions.",
+                "Обычный установщик Android блокирует понижение версии. Включите USB- или беспроводную отладку и выполните на ПК: adb install -r -d older.apk. Наши тестовые APK имеют одинаковые пакет и подпись. Удалять приложение не нужно. Лаунчер не может сам получить права ADB."))
+                .setPositiveButton(android.R.string.ok,null).show());
     }
 
     static boolean ownAsset(String value) {

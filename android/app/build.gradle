@@ -109,6 +109,8 @@ android {
 
     buildTypes {
         debug {
+            // GeneralsX @build Codex 16/10/2026 Keep test builds eligible for adb install -r -d.
+            debuggable true
             // Explicit: overrides AGP's implicit per-machine debug signingConfig
             // with the fixed in-repo key above.
             signingConfig signingConfigs.debug
