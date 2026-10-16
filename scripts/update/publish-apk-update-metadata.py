@@ -11,6 +11,8 @@ def main():
     def get(path):
         with urllib.request.urlopen(urllib.request.Request('https://api.github.com'+path,headers=headers),timeout=30) as response:return json.load(response)
     release=get(repo+'/releases/tags/'+urllib.parse.quote(args.tag,safe=''))
+    # GeneralsX @bugfix Codex 17/10/2026 Draft asset URLs change on publication.
+    if release.get('draft'):raise SystemExit('Publish the release before attaching immutable update metadata')
     assets=get(repo+f'/releases/{release["id"]}/assets?per_page=100')
     apk=next(a for a in assets if a['name']==args.apk and a['state']=='uploaded')
     if not apk.get('digest','').startswith('sha256:'):raise SystemExit('Server APK digest unavailable')
