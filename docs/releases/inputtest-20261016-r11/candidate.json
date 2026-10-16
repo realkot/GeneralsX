@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "3c8ecd9c785d1252da5fedd36e8939233626384b",
+  "run": "https://github.com/realkot/GeneralsX/actions/runs/38907550035",
+  "sha256": "f979161ee9cd7c388aa8d726c904f59e8e76d10dd60d2b3eb9dc35d1ff3b6f81",
+  "bytes": 87115564,
+  "artifactDigest": "sha256:d565ae398c24939f2952a143ccad36f3246ebc50853b08a521008c21e8458a56",
+  "versionCode": 10311,
+  "versionName": "1.4.2-inputtest.20261016-r11",
+  "package": "com.generalsx.zerohour.inputtest",
+  "status": "awaiting_owner_test",
+  "ownerApproved": false
+}
