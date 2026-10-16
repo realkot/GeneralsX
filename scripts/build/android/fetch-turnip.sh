@@ -16,7 +16,7 @@
 set -euo pipefail
 
 TURNIP_VERSION="v25.3.0-rc.11"
-TURNIP_URL="https://github.com/K11MCH1/AdrenoToolsDrivers/releases/download/${TURNIP_VERSION}/Turnip_v25.3.0_R11.zip"
+TURNIP_URL="https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/Turnip_v25.3.0_R11.zip"
 DEST="${GX_DEFAULT_DRIVER:-${HOME}/GeneralsX/android-staging/default_driver}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
@@ -28,6 +28,7 @@ fi
 
 echo "==> Downloading Turnip ${TURNIP_VERSION}"
 curl -fL -o "${TMP}/turnip.zip" "${TURNIP_URL}"
+echo "0452bdd5e966ca94b58ba7c489db3648df6715d862e38cfa939ec62625293b40  ${TMP}/turnip.zip" | sha256sum -c -
 unzip -q "${TMP}/turnip.zip" -d "${TMP}/extracted"
 
 META_FILE="$(find "${TMP}/extracted" -name meta.json | head -1)"

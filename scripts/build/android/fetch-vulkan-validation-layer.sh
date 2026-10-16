@@ -15,7 +15,7 @@ set -euo pipefail
 
 VVL_VERSION="1.4.357.0"
 VVL_TAG="vulkan-sdk-${VVL_VERSION}"
-VVL_URL="https://github.com/KhronosGroup/Vulkan-ValidationLayers/releases/download/${VVL_TAG}/android-binaries-${VVL_VERSION}.zip"
+VVL_URL="https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/android-binaries-1.4.357.0.zip"
 DEST="${GX_VULKAN_VALIDATION:-${HOME}/GeneralsX/android-staging/vulkan_validation}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
@@ -27,6 +27,7 @@ fi
 
 echo "==> Downloading Vulkan Validation Layers ${VVL_VERSION} (Android binaries)"
 curl -fL -o "${TMP}/android-binaries.zip" "${VVL_URL}"
+echo "25d124dc90706fbe0da7d4df531a5e27469d24550d8cdb51aeac9da864712bab  ${TMP}/android-binaries.zip" | sha256sum -c -
 unzip -q "${TMP}/android-binaries.zip" -d "${TMP}/extracted"
 
 LIB="$(find "${TMP}/extracted" -path "*/arm64-v8a/libVkLayer_khronos_validation.so" | head -1)"

@@ -16,13 +16,9 @@ if [[ -f "${DEST}/arial.ttf" && -f "${DEST}/arialbold.ttf" && -f "${DEST}/courie
     exit 0
 fi
 echo "==> Downloading Liberation fonts ${LIB_VERSION}"
-if ! curl -fL -o "${TMP}/liberation.tar.gz" \
-    "https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-${LIB_VERSION}.tar.gz" &&
-   ! curl -fL -o "${TMP}/liberation.tar.gz" \
-    "https://github.com/liberationfonts/liberation-fonts/releases/download/${LIB_VERSION}/liberation-fonts-ttf-${LIB_VERSION}.tar.gz"; then
-    echo "ERROR: could not download Liberation fonts ${LIB_VERSION} (check network / URLs)."
-    exit 1
-fi
+curl -fL -o "${TMP}/liberation.tar.gz" \
+    "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/liberation-fonts-ttf-${LIB_VERSION}.tar.gz"
+
 echo "${LIB_SHA256}  ${TMP}/liberation.tar.gz" | shasum -a 256 -c -
 tar -xzf "${TMP}/liberation.tar.gz" -C "${TMP}"
 SRC="$(find "${TMP}" -name "LiberationSans-Regular.ttf" -exec dirname {} \; | head -1)"

@@ -1,0 +1,81 @@
+{
+  "sources": [
+    {
+      "name": "SDL3",
+      "revision": "683181b47cfabd293e3ea409f838915b8297a4fd",
+      "sourcePath": "sources/SDL3"
+    },
+    {
+      "name": "SDL3_IMAGE",
+      "revision": "ad58ecfc27a1bd09e510ceff8bbbdb1094806476",
+      "sourcePath": "sources/SDL3_IMAGE"
+    },
+    {
+      "name": "OPENAL_SOFT",
+      "revision": "b621b5fce739525418f36e0474a46f9e1cab5e64",
+      "sourcePath": "sources/OPENAL_SOFT"
+    },
+    {
+      "name": "GAMESPY",
+      "revision": "07e3d15c500415abc281efb74322ab6d9c857eb8",
+      "sourcePath": "sources/GAMESPY"
+    },
+    {
+      "name": "ADRENOTOOLS",
+      "revision": "8fae8ce254dfc1344527e05301e43f37dea2df80",
+      "sourcePath": "sources/ADRENOTOOLS"
+    },
+    {
+      "name": "LZHL",
+      "revision": "dfd96e2ca64adaddb35dd4ebadd6add7d5586783",
+      "sourcePath": "sources/LZHL"
+    },
+    {
+      "name": "DXVK",
+      "revision": "46a3bc018bcae408d49d3c500e4e536a11f6789a",
+      "sourcePath": "sources/DXVK"
+    }
+  ],
+  "sha256": "5e0df096ae074d050a8d9908832b9aac081ad54723426082d0bc07e93ab8cba3",
+  "bytes": 193233284,
+  "note": "Source snapshot from retained r11 build environment; existing platform patches retained. Original licenses inside sources and archives; vcpkg copyright notices included. No toolchain, game assets or Git credentials.",
+  "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/android-sources-20261016.tar.gz",
+  "assets": [
+    {
+      "name": "android-binaries-1.4.357.0.zip",
+      "bytes": 31838484,
+      "sha256": "25d124dc90706fbe0da7d4df531a5e27469d24550d8cdb51aeac9da864712bab",
+      "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/android-binaries-1.4.357.0.zip"
+    },
+    {
+      "name": "android-sources-20261016.tar.gz",
+      "bytes": 193233284,
+      "sha256": "5e0df096ae074d050a8d9908832b9aac081ad54723426082d0bc07e93ab8cba3",
+      "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/android-sources-20261016.tar.gz"
+    },
+    {
+      "name": "Khronos-LICENSE.txt",
+      "bytes": 17054,
+      "sha256": "db3010170b904cb7212ef6abd2336f316bf735060eeeca23f1a737f459cc73e4",
+      "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/Khronos-LICENSE.txt"
+    },
+    {
+      "name": "liberation-fonts-ttf-2.1.5.tar.gz",
+      "bytes": 2385008,
+      "sha256": "7191c669bf38899f73a2094ed00f7b800553364f90e2637010a69c0e268f25d0",
+      "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/liberation-fonts-ttf-2.1.5.tar.gz"
+    },
+    {
+      "name": "Mesa-license.html",
+      "bytes": 18044,
+      "sha256": "9e0c5f9cba3e7b810ca8ee1f306073e80f6d18d89f05497eb7a4b9f487ff7c5d",
+      "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/Mesa-license.html"
+    },
+    {
+      "name": "Turnip_v25.3.0_R11.zip",
+      "bytes": 3365701,
+      "sha256": "0452bdd5e966ca94b58ba7c489db3648df6715d862e38cfa939ec62625293b40",
+      "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/Turnip_v25.3.0_R11.zip"
+    }
+  ]
+}

@@ -19,7 +19,11 @@ NDK_VERSION="27.2.12479018"
 CMDLINE_TOOLS_VERSION="13114758"
 CMDLINE_TOOLS_SHA1="5fdcc763663eefb86a5b8879697aa6088b041e70"
 VCPKG_COMMIT="42e4e33e1505c9f47b58c21e0f557c1571b751ee"
-FETCHCONTENT_SRC="/opt/fetchcontent-src"
+# GeneralsX @build Codex 16/10/2026 Use owner-hosted sources; preserve all caches.
+OWNED_EXPORTS=$(python3 "${REPO}/scripts/build/android/prepare-owned-dependencies.py" --shell)
+eval "$OWNED_EXPORTS"
+FETCHCONTENT_SRC="${GX_FETCHCONTENT_SRC:-/opt/fetchcontent-src}"
+OWNED_CMAKE_ARGS=(-C "$GX_OWNED_CMAKE_FILE")
 SDL3_TAG="release-3.4.2"
 SDL3_IMAGE_TAG="release-3.4.0"
 OPENAL_SOFT_TAG="1.24.2"
@@ -106,14 +110,14 @@ for entry in "SDL3-src:https://github.com/libsdl-org/SDL.git:${SDL3_TAG}" \
              "SDL3_image-src:https://github.com/libsdl-org/SDL_image.git:${SDL3_IMAGE_TAG}" \
              "openal-soft-src:https://github.com/kcat/openal-soft.git:${OPENAL_SOFT_TAG}"; do
   dir="${entry%%:*}"; rest="${entry#*:}"; repo_url="${rest%:*}"; tag="${rest##*:}"
-  if [ ! -d "${FETCHCONTENT_SRC}/${dir}/.git" ]; then
+  if [ ! -f "${FETCHCONTENT_SRC}/${dir}/CMakeLists.txt" ]; then
     git clone --quiet --depth 1 --branch "${tag}" "${repo_url}" "${FETCHCONTENT_SRC}/${dir}"
   fi
 done
 
 echo "=== [6/8] Configure CMake (Android) ==="
 mkdir -p logs
-cmake --preset "${PRESET}" \
+cmake --preset "${PRESET}" "${OWNED_CMAKE_ARGS[@]}" \
   -DCMAKE_C_COMPILER_LAUNCHER=ccache \
   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
   -DANDROID_CI_BUILD_NUMBER=$(date +%s) \

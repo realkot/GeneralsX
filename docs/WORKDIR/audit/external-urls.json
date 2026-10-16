@@ -1,0 +1,242 @@
+[
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/ApkUpdates.java",
+    "line": 28,
+    "url": "https://api.github.com/repos/"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/ApkUpdates.java",
+    "line": 57,
+    "url": "https://github.com/"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/DataPackInstaller.java",
+    "line": 72,
+    "url": "https://cdn.playgenerals.online/manifest.json"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/GeneralsOnlineActivity.java",
+    "line": 71,
+    "url": "https://www.playgenerals.online/login/?gamecode=%s"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/GeneralsOnlineSession.java",
+    "line": 55,
+    "url": "https://api.playgenerals.online/env/prod/contract/1/"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/GeneralsOnlineSession.java",
+    "line": 67,
+    "url": "https://api-ru.playgenerals.online/env/prod/contract/1/"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/NetworkDiagnostics.java",
+    "line": 334,
+    "url": "https://www.playgenerals.online/"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/SetupActivity.java",
+    "line": 2840,
+    "url": "https://api.github.com/repos/realkot/GeneralsX/contents/languages?ref=resources"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/SetupActivity.java",
+    "line": 2842,
+    "url": "https://raw.githubusercontent.com/realkot/GeneralsX/resources/languages/"
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/SupportLinks.java",
+    "line": 35,
+    "url": "https://..."
+  },
+  {
+    "path": "android/app/src/main/java/com/generalsx/zerohour/UpdateTrust.java",
+    "line": 17,
+    "url": "https://raw.githubusercontent.com/koreazolfakar-droid/GeneralsZH-Android-Port/updates/"
+  },
+  {
+    "path": "cmake/adrenotools.cmake",
+    "line": 2,
+    "url": "https://github.com/bylaws/libadrenotools,"
+  },
+  {
+    "path": "cmake/adrenotools.cmake",
+    "line": 30,
+    "url": "https://github.com/bylaws/libadrenotools.git"
+  },
+  {
+    "path": "cmake/bink.cmake",
+    "line": 3,
+    "url": "https://github.com/TheSuperHackers/bink-sdk-stub.git"
+  },
+  {
+    "path": "cmake/compilers.cmake",
+    "line": 57,
+    "url": "https://github.com/TheSuperHackers/GeneralsGameCode/pull/2670"
+  },
+  {
+    "path": "cmake/config-build.cmake",
+    "line": 161,
+    "url": "https://vulkan.lunarg.com/sdk/home#mac"
+  },
+  {
+    "path": "cmake/dx8.cmake",
+    "line": 25,
+    "url": "https://github.com/TheSuperHackers/min-dx8-sdk.git"
+  },
+  {
+    "path": "cmake/dx8.cmake",
+    "line": 224,
+    "url": "https://github.com/fbraz3/dxvk.git"
+  },
+  {
+    "path": "cmake/dx8.cmake",
+    "line": 785,
+    "url": "https://github.com/doitsujin/dxvk/releases/download/v2.6/dxvk-native-2.6-steamrt-sniper.tar.gz"
+  },
+  {
+    "path": "cmake/gamemath.cmake",
+    "line": 11,
+    "url": "https://github.com/TheSuperHackers/GeneralsGameCode/pull/2670"
+  },
+  {
+    "path": "cmake/gamemath.cmake",
+    "line": 38,
+    "url": "https://github.com/TheSuperHackers/GeneralsGameCode.git"
+  },
+  {
+    "path": "cmake/gamespy.cmake",
+    "line": 6,
+    "url": "https://github.com/TheAssemblyArmada/GamespySDK.git"
+  },
+  {
+    "path": "cmake/lzhl.cmake",
+    "line": 8,
+    "url": "https://github.com/TheSuperHackers/lzhl-1.0"
+  },
+  {
+    "path": "cmake/miles.cmake",
+    "line": 3,
+    "url": "https://github.com/TheSuperHackers/miles-sdk-stub.git"
+  },
+  {
+    "path": "cmake/openal.cmake",
+    "line": 34,
+    "url": "https://github.com/kcat/openal-soft/archive/refs/tags/1.24.2.tar.gz"
+  },
+  {
+    "path": "cmake/reactos-atl.cmake",
+    "line": 12,
+    "url": "https://github.com/reactos/reactos.git"
+  },
+  {
+    "path": "cmake/sdl3.cmake",
+    "line": 15,
+    "url": "https://github.com/libsdl-org/SDL/releases/download/release-3.4.2/SDL3-3.4.2.tar.gz"
+  },
+  {
+    "path": "cmake/sdl3.cmake",
+    "line": 23,
+    "url": "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/SDL3-${SDL3_VERSION}.tar.gz"
+  },
+  {
+    "path": "cmake/sdl3.cmake",
+    "line": 107,
+    "url": "https://github.com/libsdl-org/SDL_image/releases/download/release-${SDL3_IMAGE_VERSION}/SDL3_image-${SDL3_IMAGE_VERSION}.tar.gz"
+  },
+  {
+    "path": "cmake/stlport.cmake",
+    "line": 3,
+    "url": "https://github.com/TheSuperHackers/stlport-4.5.3.git"
+  },
+  {
+    "path": "cmake/tracy.cmake",
+    "line": 5,
+    "url": "https://github.com/TheSuperHackers/tracy"
+  },
+  {
+    "path": "cmake/zlib.cmake",
+    "line": 4,
+    "url": "https://github.com/TheSuperHackers/zlib-1.1.4"
+  },
+  {
+    "path": "scripts/build/android/build-android-zh.sh",
+    "line": 41,
+    "url": "https://github.com/microsoft/vcpkg"
+  },
+  {
+    "path": "scripts/build/android/build-local-sandboxed.sh",
+    "line": 47,
+    "url": "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip"
+  },
+  {
+    "path": "scripts/build/android/build-local-sandboxed.sh",
+    "line": 77,
+    "url": "https://github.com/microsoft/vcpkg.git"
+  },
+  {
+    "path": "scripts/build/android/build-local-sandboxed.sh",
+    "line": 109,
+    "url": "https://github.com/libsdl-org/SDL.git:${SDL3_TAG}"
+  },
+  {
+    "path": "scripts/build/android/build-local-sandboxed.sh",
+    "line": 110,
+    "url": "https://github.com/libsdl-org/SDL_image.git:${SDL3_IMAGE_TAG}"
+  },
+  {
+    "path": "scripts/build/android/build-local-sandboxed.sh",
+    "line": 111,
+    "url": "https://github.com/kcat/openal-soft.git:${OPENAL_SOFT_TAG}"
+  },
+  {
+    "path": "scripts/build/android/fetch-turnip.sh",
+    "line": 19,
+    "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/Turnip_v25.3.0_R11.zip"
+  },
+  {
+    "path": "scripts/build/android/fetch-vulkan-validation-layer.sh",
+    "line": 18,
+    "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/android-binaries-1.4.357.0.zip"
+  },
+  {
+    "path": "scripts/build/android/vcpkg-sandbox-patches/vcpkg_download_distfile.cmake",
+    "line": 127,
+    "url": "https://github\\\\.com/([^/]+)/([^/]+)/archive/(.+)\\\\.(tar\\\\.gz|tgz|zip)$"
+  },
+  {
+    "path": "scripts/build/android/vcpkg-sandbox-patches/vcpkg_download_distfile.cmake",
+    "line": 141,
+    "url": "https://github.com/${gh_org}/${gh_repo}.git"
+  },
+  {
+    "path": "scripts/build/android/vcpkg-sandbox-patches/vcpkg_from_github.cmake",
+    "line": 26,
+    "url": "https://github.com"
+  },
+  {
+    "path": "scripts/build/android/vcpkg-sandbox-patches/vcpkg_from_github.cmake",
+    "line": 27,
+    "url": "https://api.github.com"
+  },
+  {
+    "path": "scripts/build/ios/fetch-moltenvk.sh",
+    "line": 19,
+    "url": "https://github.com/KhronosGroup/MoltenVK/releases/download/${MVK_VERSION}/MoltenVK-ios.tar"
+  },
+  {
+    "path": "scripts/build/ios/stage-fonts.sh",
+    "line": 20,
+    "url": "https://github.com/realkot/GeneralsX/releases/download/android-dependencies-20261016/liberation-fonts-ttf-${LIB_VERSION}.tar.gz"
+  },
+  {
+    "path": "scripts/update/publish-apk-update-metadata.py",
+    "line": 12,
+    "url": "https://api.github.com"
+  },
+  {
+    "path": "scripts/update/publish-update.py",
+    "line": 16,
+    "url": "https://raw.githubusercontent.com/MYSOREZ/GeneralsZH-Android-Port/updates/"
+  }
+]
