@@ -19,8 +19,8 @@ APK cleanup and publication examples in AGENTS.md and inherited guides.
 - Do not dispatch GitHub Actions. Preserve upstream licenses and attribution.
 
 Current accepted application baseline: r9. Documentation-only main updates do not accept application code.
-Latest candidate: r12, versionCode 10312, versionName `1.4.3-inputtest.20261017-r12`, test package unchanged.
-r12 includes the APK updater and owner-resource migration and awaits explicit owner testing.
+Latest experimental candidate: r13, versionCode 10313, versionName `1.4.4-inputtest.20261017-r13`, test package unchanged.
+r13 retains the r12 updater/resources and adds opt-in offline render FPS; both remain pending explicit owner testing.
 
 ## Launcher APK update metadata
 

@@ -1,0 +1,18 @@
+{
+  "sourceCommit": "f509ec1e858e407903cd81d9dee6713a3394907c",
+  "sha256": "96927febb7150fad921a7a577b6b071ac4d8731be9e7e899e14573124c09c8de",
+  "bytes": 87188144,
+  "versionCode": 10313,
+  "versionName": "1.4.4-inputtest.20261017-r13",
+  "package": "com.generalsx.zerohour.inputtest",
+  "status": "awaiting_owner_test",
+  "ownerApproved": false,
+  "build": "local WSL dual-Hz",
+  "tests": {
+    "tests": 58,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "deviceValidation": "pending; actual 120 FPS not measured"
+}
