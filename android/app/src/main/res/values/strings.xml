@@ -523,4 +523,10 @@
     <string name="tablet_save_error">Could not save settings. Check available storage.</string>
     <string name="tablet_no_log">No order log yet. Enable recording, restart the game and reproduce the issue.</string>
     <string name="tablet_log_error">Could not read the order log.</string>
+
+    <!-- GeneralsX @feature Codex 17/10/2026 Independent render FPS experiment. -->
+    <string name="setup_render_fps_title">Render FPS (experimental)</string>
+    <string name="setup_render_fps_default">Default</string>
+    <string name="setup_render_fps_saved">Saved. Completely close and restart the game.</string>
+    <string name="setup_render_fps_help">Offline battles at normal game speed only. Simulation stays at 30/60 Hz; the render cap cannot be lower than simulation Hz. Network games, replays and custom game speed keep their original timing. Android may ignore the display request; actual FPS depends on load and the screen. No frame generation or guaranteed 120 FPS. Default restores legacy behaviour.</string>
 </resources>

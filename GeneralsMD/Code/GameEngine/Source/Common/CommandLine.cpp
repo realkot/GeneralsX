@@ -27,6 +27,7 @@
 
 #include "Common/ArchiveFileSystem.h"
 #include "Common/CommandLine.h"
+#include "Common/FramePacer.h"
 #include "Common/GXReplayCheck.h"
 #include "Common/GXSafeArea.h"
 #include "Common/CRCDebug.h"
@@ -615,6 +616,13 @@ Int parseNoStaticLOD(char *args[], int num)
 
 //=============================================================================
 //=============================================================================
+// GeneralsX @feature Codex 17/10/2026 Independent optional offline render target.
+Int parseGXRenderFps(char *args[], int num)
+{
+    if (num > 1) FramePacer::setRequestedRenderFps(atoi(args[1]));
+    return num > 1 ? 2 : 1;
+}
+
 Int parseFPSLimit(char *args[], int num)
 {
 	if (num > 1)
@@ -1311,6 +1319,7 @@ static CommandLineParam paramsForEngineInit[] =
 	{ "-noDynamicLOD", parseNoDynamicLOD },
 	{ "-noStaticLOD", parseNoStaticLOD },
 	{ "-fps", parseFPSLimit },
+	{ "-gxRenderFps", parseGXRenderFps },
 	{ "-wireframe", parseWireframe },
 	{ "-showCollision", parseShowCollision },
 	{ "-noShowClientPhysics", parseNoShowClientPhysics },

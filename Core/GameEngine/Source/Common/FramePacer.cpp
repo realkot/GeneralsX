@@ -30,6 +30,23 @@
 
 FramePacer* TheFramePacer = nullptr;
 
+// GeneralsX @feature Codex 17/10/2026 Separate opt-in rendering from the retail game-speed limit.
+static Int s_requestedRenderFps = 0;
+void FramePacer::setRequestedRenderFps(Int fps)
+{
+    s_requestedRenderFps = (fps == 30 || fps == 60 || fps == 90 || fps == 120) ? fps : 0;
+}
+Bool FramePacer::isRenderOnlyRateActive() const
+{
+    // Replays, networking, custom game speeds and script fast modes retain their old timing.
+    return s_requestedRenderFps > 0 && m_maxFPS == LOGICFRAMES_PER_SECOND
+        && TheNetwork == nullptr && TheGameLogic != nullptr && TheGameLogic->isInGame()
+        && !TheGameLogic->isInReplayGame()
+        && (TheGameLogic->isInSkirmishGame() || TheGameLogic->isInSinglePlayerGame())
+        && isActualFramesPerSecondLimitEnabled();
+}
+
+
 FramePacer::FramePacer()
 {
 	// GeneralsX @bugfix BenderAI 11/05/2026 Protect Windows-specific timer API calls
@@ -114,6 +131,8 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 
 Int FramePacer::getActualFramesPerSecondLimit() const
 {
+    // GeneralsX @feature Codex 17/10/2026 Do not render slower than the selected simulation clock.
+    if (isRenderOnlyRateActive()) return std::max<Int>(s_requestedRenderFps, LOGICFRAMES_PER_SECOND);
 	return isActualFramesPerSecondLimitEnabled() ? getFramesPerSecondLimit() : RenderFpsPreset::UncappedFpsValue;
 }
 
@@ -195,6 +214,9 @@ Int FramePacer::getActualLogicTimeScaleFps(LogicTimeQueryFlags flags) const
 	{
 		return getLogicTimeScaleFps();
 	}
+
+    // GeneralsX @bugfix Codex 17/10/2026 Extra rendered frames must not create extra simulation ticks.
+    if (isRenderOnlyRateActive()) return LOGICFRAMES_PER_SECOND;
 
 	// Returns uncapped value to align with the render update as per the original game behavior.
 	return RenderFpsPreset::UncappedFpsValue;

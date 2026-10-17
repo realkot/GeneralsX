@@ -513,4 +513,10 @@
     <string name="mods_import_failed_title">Ошибка импорта</string>
     <string name="mods_import_failed_message">Ничего не установлено.\n\n%1$s</string>
     <string name="launcher_android_subtitle">ЛАУНЧЕР ДЛЯ ANDROID</string>
+
+    <!-- GeneralsX @feature Codex 17/10/2026 Independent render FPS experiment. -->
+    <string name="setup_render_fps_title">Частота отрисовки FPS (эксперимент)</string>
+    <string name="setup_render_fps_default">Штатный</string>
+    <string name="setup_render_fps_saved">Сохранено. Полностью закройте и запустите игру.</string>
+    <string name="setup_render_fps_help">Только офлайн-бой на обычной скорости. Симуляция остаётся 30/60 Гц; лимит отрисовки не ниже частоты симуляции. Сетевая игра, реплеи и изменённая скорость сохраняют прежний режим. Android может не выполнить запрос частоты экрана; реальный FPS зависит от нагрузки и экрана. Генерации кадров нет, 120 FPS не гарантируются. «Штатный» возвращает прежнее поведение.</string>
 </resources>

@@ -413,6 +413,7 @@ public class SetupActivity extends Activity {
         switch (tab) {
             case TAB_GRAPHICS:
                 buildSimRateSection(page);
+                buildRenderRateSection(page);
                 buildRenderBackendSection(page);
                 // Custom Vulkan driver / dxvk.conf only matter when Vulkan is
                 // the selected backend -- the GLES/GLES+ANGLE paths never
@@ -1691,6 +1692,19 @@ public class SetupActivity extends Activity {
     // setup_render_backend_dialog_title) are deliberately left in the string
     // resources: they are still translated in every locale and the dialog is
     // one commit away if this ever needs to go back.
+    // GeneralsX @feature Codex 17/10/2026 FPS is independent of the simulation library.
+    private void buildRenderRateSection(LinearLayout root) {
+        LinearLayout content = UiKit.card(root);
+        UiKit.sectionHeader(content, R.drawable.ic_gzh_display, getString(R.string.setup_render_fps_title), false);
+        int current = RenderRate.get(this), index = 0;
+        for (int i = 0; i < RenderRate.VALUES.length; i++) if (RenderRate.VALUES[i] == current) index = i;
+        UiKit.segmented(content, new CharSequence[]{getString(R.string.setup_render_fps_default), "30", "60", "90", "120"}, index, picked -> {
+            RenderRate.set(this, RenderRate.VALUES[picked]);
+            Toast.makeText(this, R.string.setup_render_fps_saved, Toast.LENGTH_LONG).show();
+        });
+        UiKit.helpText(content, getString(R.string.setup_render_fps_help));
+    }
+
     private void buildSimRateSection(LinearLayout root) {
         LinearLayout content = UiKit.card(root);
         TextView status = UiKit.sectionHeader(content, R.drawable.ic_gzh_chip,

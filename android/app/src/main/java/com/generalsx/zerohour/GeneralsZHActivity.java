@@ -166,6 +166,8 @@ public class GeneralsZHActivity extends SDLActivity {
             Log.i(TAG, "Launching with mod: " + activeMod);
         }
 
+        RenderRate.appendArguments(this, args, getIntent() != null && getIntent().getStringExtra(EXTRA_REPLAY) != null);
+
         Intent intent = getIntent();
         String replay = intent != null ? intent.getStringExtra(EXTRA_REPLAY) : null;
         if (replay == null || replay.isEmpty()) {
@@ -404,6 +406,7 @@ public class GeneralsZHActivity extends SDLActivity {
         }
 
         super.onCreate(savedInstanceState);
+        RenderRate.installDisplayRequest(this);
     }
 
     // GeneralsX @bugfix Android port 02/08/2026 A tester reported the camera
@@ -428,6 +431,7 @@ public class GeneralsZHActivity extends SDLActivity {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
             applyGestureNavBackBehavior();
+            RenderRate.applyWindowRequest(this);
         }
     }
 

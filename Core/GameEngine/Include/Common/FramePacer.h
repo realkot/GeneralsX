@@ -38,6 +38,10 @@ public:
 	FramePacer();
 	~FramePacer();
 
+    // GeneralsX @feature Codex 17/10/2026 Opt-in offline render rate; never a simulation clock.
+    static void setRequestedRenderFps(Int fps);
+    Bool isRenderOnlyRateActive() const;
+
 	void update(); ///< Signal that the app/render update is done and wait for the fps limit if applicable.
 
 	void setFramesPerSecondLimit( Int fps ); ///< Set the update fps limit.

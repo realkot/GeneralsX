@@ -1214,6 +1214,8 @@ static void gxCatchUpSpedUpLogic()
 		&& TheShell != nullptr && !TheShell->isShellActive()
 		&& !TheFramePacer->isTimeFrozen() && !TheFramePacer->isGameHalted()
 		&& TheFramePacer->isActualFramesPerSecondLimitEnabled()
+        // GeneralsX @bugfix Codex 17/10/2026 A render-only cap is not a game-speed request.
+        && !TheFramePacer->isRenderOnlyRateActive()
 		&& TheFramePacer->getActualFramesPerSecondLimit() > normalFps;
 	if (!applies)
 	{
