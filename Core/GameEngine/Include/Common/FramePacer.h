@@ -41,6 +41,7 @@ public:
     // GeneralsX @feature Codex 17/10/2026 Opt-in offline render rate; never a simulation clock.
     static void setRequestedRenderFps(Int fps);
     Bool isRenderOnlyRateActive() const;
+    void resetTiming(); ///< Discard suspended elapsed time without changing selected rates.
 
 	void update(); ///< Signal that the app/render update is done and wait for the fps limit if applicable.
 
@@ -71,6 +72,7 @@ public:
 	Real getLogicTimeStepMilliseconds(LogicTimeQueryFlags flags = 0) const; ///< Get the logic time step in milliseconds
 
 protected:
+    Bool hasFastTimeOverride() const;
 
 	FrameRateLimit m_frameRateLimit;
 

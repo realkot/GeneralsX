@@ -1188,11 +1188,27 @@ extern NGMPGame* TheNGMPGame;
 // the same order, only grouped differently between draws: replays and saves are unaffected.
 static UnsignedInt s_gxCatchUpSteps = 0;
 
+// GeneralsX @bugfix Codex 17/10/2026 Reset all timing domains together on the engine thread.
+static bool s_resetCatchupClock = false;
+void GameEngine::resetFrameTiming()
+{
+    m_logicTimeAccumulator = 0.0f;
+    if (TheFramePacer) TheFramePacer->resetTiming();
+    s_resetCatchupClock = true;
+}
+
 static void gxCatchUpSpedUpLogic()
 {
 	static std::chrono::steady_clock::time_point s_last;
 	static double s_debt = 0.0;
 	const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+
+    if (s_resetCatchupClock) {
+        s_last = now;
+        s_debt = 0.0;
+        s_resetCatchupClock = false;
+        return;
+    }
 	double dt = s_last.time_since_epoch().count() != 0 ? std::chrono::duration<double>(now - s_last).count() : 0.0;
 	s_last = now;
 	if (dt > 0.1)

@@ -16,3 +16,9 @@ Android API reference: [Frame rate](https://developer.android.com/media/optimize
 Native regression compiles the actual FramePacer and offline logic gate for both simulation clocks and checks ten-second render schedules, default/invalid input, replay/network/custom speed, script fast mode and pause. Android tests cover persisted selection, independent simulation, replay launch reset and unsupported display rates. These checks do not replace an actual device run.
 
 Rollback: choose Default, or use the previous r12 APK with the data-preserving ADB rollback helper. The feature is isolated in its own commit/branch; no application code is merged into main without owner acceptance.
+
+## Pending resume fix / Исправление возобновления в исходниках
+
+The published r13 APK is unchanged. Branch `codex/fix-render-resume-timing` removes the simulation clock dependency on mutable legacy FPS-limit flags and resets offline frame/logic/catch-up timing on focus/background/restore transitions. A fixed render target now remains independent even if the old limiter flag is cleared. Explicit fast modes, custom game speed, network and replay behaviour remain legacy.
+
+Опубликованный r13 содержит прежний код. Исправление пока только в исходниках: независимый игровой такт сохраняется при сбросе FPS-флагов, а после сворачивания сбрасываются временные накопители. При повторном тесте нужны версия APK, симуляция/FPS и сведения, проходит ли ускорение само. Для диагностики добавлены строки `[GX-LIFECYCLE-TIMING]` с частотами и состоянием FPS-флагов. До новой тестовой сборки при проблеме используйте «Штатный» либо предыдущий APK.

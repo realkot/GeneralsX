@@ -27,6 +27,12 @@
 
 FrameRateLimit::FrameRateLimit()
 {
+    reset();
+}
+
+// GeneralsX @bugfix Codex 17/10/2026 Do not feed background wall time to the resumed frame.
+void FrameRateLimit::reset()
+{
 #ifdef _WIN32
 	LARGE_INTEGER freq;
 	LARGE_INTEGER start;

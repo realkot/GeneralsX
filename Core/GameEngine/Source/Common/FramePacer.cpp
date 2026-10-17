@@ -43,7 +43,7 @@ Bool FramePacer::isRenderOnlyRateActive() const
         && TheNetwork == nullptr && TheGameLogic != nullptr && TheGameLogic->isInGame()
         && !TheGameLogic->isInReplayGame()
         && (TheGameLogic->isInSkirmishGame() || TheGameLogic->isInSinglePlayerGame())
-        && isActualFramesPerSecondLimitEnabled();
+        && !hasFastTimeOverride();
 }
 
 
@@ -105,7 +105,8 @@ Bool FramePacer::isFramesPerSecondLimitEnabled() const
 	return m_enableFpsLimit;
 }
 
-Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
+// GeneralsX @bugfix Codex 17/10/2026 Render-only simulation cannot depend on a mutable FPS-limit flag.
+Bool FramePacer::hasFastTimeOverride() const
 {
 	Bool allowFpsLimit = true;
 
@@ -123,10 +124,21 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 #endif
 	}
 
-	allowFpsLimit &= TheGlobalData->m_useFpsLimit;
-	allowFpsLimit &= isFramesPerSecondLimitEnabled();
 
-	return allowFpsLimit;
+	return !allowFpsLimit;
+}
+
+Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
+{
+    return !hasFastTimeOverride() && TheGlobalData->m_useFpsLimit && isFramesPerSecondLimitEnabled();
+}
+
+// GeneralsX @bugfix Codex 17/10/2026 Called on the engine thread after mobile lifecycle transitions.
+void FramePacer::resetTiming()
+{
+    m_frameRateLimit.reset();
+    // Keep delta finite: clients also query 1 / updateTime before the next wait.
+    m_updateTime = 1.0f / (Real)std::max<Int>(getActualFramesPerSecondLimit(), 1);
 }
 
 Int FramePacer::getActualFramesPerSecondLimit() const

@@ -25,6 +25,7 @@ class FrameRateLimit
 {
 public:
 	FrameRateLimit();
+    void reset(); ///< Restart the monotonic interval after suspension.
 
 	Real wait(UnsignedInt maxFps);
 

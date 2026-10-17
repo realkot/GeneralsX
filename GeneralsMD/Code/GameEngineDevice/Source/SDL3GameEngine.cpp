@@ -76,6 +76,7 @@
 #include "Common/GameAudio.h"
 #include "GameLogic/GameLogic.h"
 #include "Common/FramePacer.h"
+#include "GameNetwork/NetworkInterface.h"
 #include "SDL3Device/GameClient/TouchInput.h"
 #include "SDL3Device/GameClient/AndroidTextEditor.h"
 #if defined(__APPLE__)
@@ -125,6 +126,8 @@ extern GameWindowManager *TheWindowManager;
 // multitasking a few times"). Pause whenever either is set.
 static std::atomic<bool> s_appBackgrounded{false};
 static std::atomic<bool> s_appInactive{false};
+// GeneralsX @bugfix Codex 17/10/2026 Watcher threads only request; engine thread resets clocks.
+static std::atomic<bool> s_timingResetRequested{false};
 
 // GeneralsX @bugfix Android port 08/09/2026 Whether the background transition is what
 // silenced the audio, so the foreground transition resumes exactly that and nothing
@@ -160,14 +163,17 @@ static bool SDLCALL mobileLifecycleWatcher(void *userdata, SDL_Event *event)
 	switch (event->type) {
 		case SDL_EVENT_WILL_ENTER_BACKGROUND:
 			logMobileLifecycleEvent("WILL_ENTER_BACKGROUND");
+            s_timingResetRequested.store(true);
 			s_appBackgrounded.store(true);
 			break;
 		case SDL_EVENT_DID_ENTER_BACKGROUND:
 			logMobileLifecycleEvent("DID_ENTER_BACKGROUND");
+            s_timingResetRequested.store(true);
 			s_appBackgrounded.store(true);
 			break;
 		case SDL_EVENT_DID_ENTER_FOREGROUND:
 			logMobileLifecycleEvent("DID_ENTER_FOREGROUND");
+            s_timingResetRequested.store(true);
 			s_appBackgrounded.store(false);
 			break;
 		// Resign/become active. On iOS, SDL maps applicationWillResignActive ->
@@ -176,10 +182,12 @@ static bool SDLCALL mobileLifecycleWatcher(void *userdata, SDL_Event *event)
 		// after DID_ENTER_FOREGROUND.
 		case SDL_EVENT_WINDOW_FOCUS_LOST:
 			logMobileLifecycleEvent("WINDOW_FOCUS_LOST");
+            s_timingResetRequested.store(true);
 			s_appInactive.store(true);
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			logMobileLifecycleEvent("WINDOW_FOCUS_GAINED");
+            s_timingResetRequested.store(true);
 			s_appInactive.store(false);
 			break;
 		case SDL_EVENT_WINDOW_OCCLUDED:
@@ -187,6 +195,7 @@ static bool SDLCALL mobileLifecycleWatcher(void *userdata, SDL_Event *event)
 			break;
 		case SDL_EVENT_WINDOW_RESTORED:
 			logMobileLifecycleEvent("WINDOW_RESTORED");
+            s_timingResetRequested.store(true);
 			break;
 		case SDL_EVENT_WINDOW_HIDDEN:
 			logMobileLifecycleEvent("WINDOW_HIDDEN");
@@ -199,6 +208,7 @@ static bool SDLCALL mobileLifecycleWatcher(void *userdata, SDL_Event *event)
 			break;
 		case SDL_EVENT_WINDOW_MINIMIZED:
 			logMobileLifecycleEvent("WINDOW_MINIMIZED");
+            s_timingResetRequested.store(true);
 			break;
 		case SDL_EVENT_WINDOW_MAXIMIZED:
 			logMobileLifecycleEvent("WINDOW_MAXIMIZED");
@@ -2849,6 +2859,18 @@ void SDL3GameEngine::update(void)
 	// patch in the same spot every single time in Recents and in screenshots,
 	// never during actual play -- consistent with the OS snapshotting a
 	// still-mid-render frame rather than a genuine capture-time race.
+    // GeneralsX @bugfix Codex 17/10/2026 Discard background elapsed time/debt, never mutate network/replay clocks.
+    // GX_RESUME_TIMING_BEGIN
+    if (s_timingResetRequested.exchange(false) && TheFramePacer && TheNetwork == nullptr
+        && (TheGameLogic == nullptr || !TheGameLogic->isInReplayGame())) {
+        resetFrameTiming();
+        fprintf(stderr, "[GX-LIFECYCLE-TIMING] reset; render=%d gameFps=%d simHz=%d logicHz=%d independent=%d fpsFlags=%d/%d\n",
+            TheFramePacer->getActualFramesPerSecondLimit(), TheFramePacer->getFramesPerSecondLimit(),
+            LOGICFRAMES_PER_SECOND, TheFramePacer->getActualLogicTimeScaleFps(FramePacer::IgnoreFrozenTime | FramePacer::IgnoreHaltedGame),
+            TheFramePacer->isRenderOnlyRateActive(), TheGlobalData->m_useFpsLimit,
+            TheFramePacer->isFramesPerSecondLimitEnabled());
+    }
+    // GX_RESUME_TIMING_END
 	static bool s_wasPausedLastFrame = false;
 	const bool pausedNow = mobileShouldPauseRendering();
 	if (pausedNow && s_wasPausedLastFrame) {

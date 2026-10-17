@@ -82,6 +82,7 @@ public:
 	virtual void setIsActive(Bool isActive) { m_isActive = isActive; };
 
 protected:
+    void resetFrameTiming(); ///< Reset offline frame/logic/catch-up clocks on resume.
 
 	virtual void resetSubsystems();
 
