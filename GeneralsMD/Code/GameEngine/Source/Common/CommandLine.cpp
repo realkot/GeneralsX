@@ -50,6 +50,13 @@
 
 
 
+// GeneralsX @feature Codex 17/10/2026 Independent optional offline render target.
+Int parseGXRenderFps(char *args[], int num)
+{
+    if (num > 1) FramePacer::setRequestedRenderFps(atoi(args[1]));
+    return num > 1 ? 2 : 1;
+}
+
 Bool TheDebugIgnoreSyncErrors = FALSE;
 extern Int DX8Wrapper_PreserveFPU;
 
@@ -616,13 +623,6 @@ Int parseNoStaticLOD(char *args[], int num)
 
 //=============================================================================
 //=============================================================================
-// GeneralsX @feature Codex 17/10/2026 Independent optional offline render target.
-Int parseGXRenderFps(char *args[], int num)
-{
-    if (num > 1) FramePacer::setRequestedRenderFps(atoi(args[1]));
-    return num > 1 ? 2 : 1;
-}
-
 Int parseFPSLimit(char *args[], int num)
 {
 	if (num > 1)

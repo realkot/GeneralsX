@@ -102,4 +102,7 @@ table=command[start:end]
 for debug in (0,1):
     processed=subprocess.check_output(['g++','-E','-P','-x','c++','-D__ANDROID__=1',*(['-DRTS_DEBUG=1'] if debug else []),'-'],input=table,text=True)
     assert processed.count('"-gxRenderFps"')==1, 'Render option missing from release parser'
+    without_includes='\n'.join(line for line in command.splitlines() if not line.lstrip().startswith('#include'))
+    full=subprocess.check_output(['g++','-E','-P','-x','c++','-D__ANDROID__=1',*(['-DRTS_DEBUG=1'] if debug else []),'-'],input=without_includes,text=True)
+    assert 'Int parseGXRenderFps(' in full, 'Render parser implementation missing from release engine'
 print('PASS render option registered in both release/debug engine-init parsers')
