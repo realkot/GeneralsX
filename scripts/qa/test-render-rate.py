@@ -92,3 +92,14 @@ for hz in (30,60):
  subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror',f'-DTEST_HZ={hz}','-I'+str(out/'stubs'),'-I'+str(ROOT/'Core/GameEngine/Include'),str(source),str(ROOT/'Core/GameEngine/Source/Common/FramePacer.cpp'),'-o',str(binary)],check=True)
  subprocess.run([str(binary)],check=True)
 assert '!TheFramePacer->isRenderOnlyRateActive()' in engine
+
+# Preprocess the actual registration table with release/debug flags: a parsed option
+# must survive the same conditional compilation as the production release engine.
+command=(ROOT/'GeneralsMD/Code/GameEngine/Source/Common/CommandLine.cpp').read_text()
+start=command.index('static CommandLineParam paramsForEngineInit[]')
+end=command.index('\n};',start)+3
+table=command[start:end]
+for debug in (0,1):
+    processed=subprocess.check_output(['g++','-E','-P','-x','c++','-D__ANDROID__=1',*(['-DRTS_DEBUG=1'] if debug else []),'-'],input=table,text=True)
+    assert processed.count('"-gxRenderFps"')==1, 'Render option missing from release parser'
+print('PASS render option registered in both release/debug engine-init parsers')

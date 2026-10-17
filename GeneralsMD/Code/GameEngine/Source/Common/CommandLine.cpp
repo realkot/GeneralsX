@@ -1220,6 +1220,8 @@ static CommandLineParam paramsForStartup[] =
 // These Params are parsed during Engine Init before INI data is loaded
 static CommandLineParam paramsForEngineInit[] =
 {
+    // GeneralsX @bugfix Codex 17/10/2026 Available in release engines, independent of debug -fps.
+    { "-gxRenderFps", parseGXRenderFps },
 	{ "-nologo", parseNoLogo }, // TheSuperHackers @tweak Is now available in Release builds.
 	{ "-noshellmap", parseNoShellMap },
 	{ "-noShellAnim", parseNoWindowAnimation }, // TheSuperHackers @tweak Is now available in Release builds.
@@ -1319,7 +1321,6 @@ static CommandLineParam paramsForEngineInit[] =
 	{ "-noDynamicLOD", parseNoDynamicLOD },
 	{ "-noStaticLOD", parseNoStaticLOD },
 	{ "-fps", parseFPSLimit },
-	{ "-gxRenderFps", parseGXRenderFps },
 	{ "-wireframe", parseWireframe },
 	{ "-showCollision", parseShowCollision },
 	{ "-noShowClientPhysics", parseNoShowClientPhysics },
